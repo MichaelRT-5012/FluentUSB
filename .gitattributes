@@ -1,0 +1,38 @@
+###############################################################################
+# Set default behavior to automatically normalize line endings.
+###############################################################################
+* text=auto
+
+###############################################################################
+# Set default behavior for command prompt diff.
+#
+# This is needed for earlier versions of Git for Windows, which does not
+# have a built-in diff tool for .doc files.
+###############################################################################
+#*.doc diff=astextplain
+#*.DOC diff=astextplain
+#*.docx diff=astextplain
+#*.DOCX diff=astextplain
+#*.dot diff=astextplain
+#*.DOT diff=astextplain
+#*.pdf diff=astextplain
+#*.PDF diff=astextplain
+#*.rtf diff=astextplain
+#*.RTF diff=astextplain
+
+###############################################################################
+# Common C# / .NET settings
+###############################################################################
+*.cs     text eol=crlf diff=csharp
+*.axaml  text eol=crlf
+*.xaml   text eol=crlf
+*.csproj text eol=crlf
+*.sln    text eol=crlf
+*.json   text eol=crlf
+
+# Image / binary assets
+*.png    binary
+*.ico    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
