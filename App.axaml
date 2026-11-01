@@ -4,6 +4,28 @@
              xmlns:local="using:FluentUSB">
              <!-- 主题由 App.axaml.cs 依据 UiOptions.Theme 设置（预留深浅切换） -->
 
+    <!--
+        亚克力窗口的自定义卡片底色。
+        仅依赖系统亚克力时，背景为亮色（白色壁纸/浅色窗口）会让文字与背景对比度不足；
+        这里在亚克力之上叠一层高不透明度底色，任何背景都可读，同时仍透出少量模糊质感。
+    -->
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#CC171717" />
+                    <SolidColorBrush x:Key="CardBorderBrush" Color="#26FFFFFF" />
+                    <SolidColorBrush x:Key="CardHoverBrush" Color="#1FFFFFFF" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#E6F9F9F9" />
+                    <SolidColorBrush x:Key="CardBorderBrush" Color="#14000000" />
+                    <SolidColorBrush x:Key="CardHoverBrush" Color="#12000000" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
     <Application.DataTemplates>
         <local:ViewLocator/>
     </Application.DataTemplates>

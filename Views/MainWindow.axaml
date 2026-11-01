@@ -3,14 +3,16 @@
         xmlns:vm="using:FluentUSB.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="300"
-        Width="480" Height="300"
+        mc:Ignorable="d" d:DesignWidth="460" d:DesignHeight="360"
+        Width="460" Height="360"
+        MinWidth="400" MinHeight="260"
         x:Class="FluentUSB.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="FluentUSB"
         Background="Transparent"
-        TransparencyLevelHint="AcrylicBlur, Blur">
+        TransparencyLevelHint="AcrylicBlur, Blur"
+        TextOptions.TextRenderingMode="Antialias">
 
     <Design.DataContext>
         <!-- This only sets the DataContext for the previewer in an IDE,
@@ -18,15 +20,113 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <StackPanel Spacing="12" Margin="24"
-                HorizontalAlignment="Center" VerticalAlignment="Center">
-        <TextBlock Text="{Binding AppName}"
-                   FontSize="32" FontWeight="SemiBold"
-                   HorizontalAlignment="Center"/>
-        <TextBlock Text="{Binding Description}"
-                   FontSize="14" Opacity="0.8"
-                   TextWrapping="Wrap" TextAlignment="Center"
-                   HorizontalAlignment="Center"/>
-    </StackPanel>
+    <Window.Styles>
+        <Style Selector="Button.DriveRow">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.DriveRow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource CardHoverBrush}"/>
+        </Style>
+    </Window.Styles>
 
+    <!-- 卡片底色叠在亚克力之上：避免白色背景下文字看不清 -->
+    <Border Background="{DynamicResource CardSurfaceBrush}">
+        <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20,18,20,14">
+
+            <!-- 标题 + 监听状态 -->
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="1">
+                    <TextBlock Text="{Binding AppName}" FontSize="20" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding Subtitle}" FontSize="12" Opacity="0.6"/>
+                </StackPanel>
+                <Border Grid.Column="1" VerticalAlignment="Center" CornerRadius="10"
+                        Padding="9,4" Background="{DynamicResource CardHoverBrush}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Ellipse Width="6" Height="6" VerticalAlignment="Center"
+                                 Fill="{DynamicResource SystemControlBackgroundAccentBrush}"/>
+                        <TextBlock Text="{Binding StatusText}" FontSize="11" Opacity="0.85"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <TextBlock Grid.Row="1" Margin="2,18,0,8" Text="已连接的 U 盘"
+                       FontSize="12" FontWeight="SemiBold" Opacity="0.7"/>
+
+            <!-- 列表 / 空状态 -->
+            <Grid Grid.Row="2">
+                <ScrollViewer IsVisible="{Binding HasDrives}" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding DriveList}" Margin="0,0,-6,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:UsbDriveViewModel">
+                                <Button Classes="DriveRow" Command="{Binding OpenDriveCommand}"
+                                        Margin="0,0,0,2" ToolTip.Tip="在资源管理器中打开">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+
+                                        <Grid Width="34" Height="34" VerticalAlignment="Center">
+                                            <Border CornerRadius="8" Opacity="0.16"
+                                                    Background="{DynamicResource SystemControlBackgroundAccentBrush}"/>
+                                            <TextBlock Text="&#xE88E;"
+                                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                       FontSize="16"
+                                                       Foreground="{DynamicResource SystemControlBackgroundAccentBrush}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Grid>
+
+                                        <StackPanel Grid.Column="1" Margin="12,0,8,0" Spacing="2"
+                                                    VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontSize="14" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           VerticalAlignment="Center"/>
+                                                <Border CornerRadius="4" Padding="6,1"
+                                                        Background="{DynamicResource CardHoverBrush}"
+                                                        VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding DriveLetter}" FontSize="11"
+                                                               FontWeight="SemiBold"/>
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock FontSize="11" Opacity="0.6"
+                                                       TextTrimming="CharacterEllipsis">
+                                                <Run Text="{Binding SizeSummary}"/><Run Text=" · "/><Run Text="{Binding FormatText}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+
+                                        <TextBlock Grid.Column="2" Text="&#xE76C;"
+                                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                   FontSize="12" Opacity="0.45"
+                                                   VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <StackPanel IsVisible="{Binding !HasDrives}" Spacing="6"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="&#xE88E;"
+                               FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                               FontSize="28" Opacity="0.25"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="还没有连接 U 盘" FontSize="13" Opacity="0.75"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="插入后会自动弹出提示，也可以从托盘菜单打开本窗口"
+                               FontSize="11" Opacity="0.45" MaxWidth="280"
+                               TextWrapping="Wrap" TextAlignment="Center"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock Grid.Row="3" Margin="2,10,0,0" Opacity="0.45" FontSize="11"
+                       Text="点击列表中的 U 盘可在资源管理器中打开"/>
+        </Grid>
+    </Border>
 </Window>
