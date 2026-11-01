@@ -3,11 +3,14 @@
         xmlns:vm="using:FluentUSB.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="300"
+        Width="480" Height="300"
         x:Class="FluentUSB.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="FluentUSB">
+        Title="FluentUSB"
+        Background="Transparent"
+        TransparencyLevelHint="AcrylicBlur, Blur">
 
     <Design.DataContext>
         <!-- This only sets the DataContext for the previewer in an IDE,
@@ -15,6 +18,15 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <StackPanel Spacing="12" Margin="24"
+                HorizontalAlignment="Center" VerticalAlignment="Center">
+        <TextBlock Text="{Binding AppName}"
+                   FontSize="32" FontWeight="SemiBold"
+                   HorizontalAlignment="Center"/>
+        <TextBlock Text="{Binding Description}"
+                   FontSize="14" Opacity="0.8"
+                   TextWrapping="Wrap" TextAlignment="Center"
+                   HorizontalAlignment="Center"/>
+    </StackPanel>
 
 </Window>
