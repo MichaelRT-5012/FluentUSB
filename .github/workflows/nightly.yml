@@ -1,0 +1,141 @@
+name: Nightly Build
+
+# 每天北京时间 02:00（= 18:00 UTC）自动打包；也可在 Actions 页面手动触发
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  # 判定本次是否有新提交、今天是否已经发过 nightly
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.decide.outputs.tag }}
+      skip: ${{ steps.decide.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: decide
+        shell: bash
+        run: |
+          git fetch --tags --force --quiet
+          tag="Nightly-$(TZ=Asia/Shanghai date +%Y-%m-%d)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          skip=false
+          if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+            echo "今天的 nightly 已发布：$tag"
+            skip=true
+          else
+            prev=$(git tag -l 'Nightly-*' | sort -r | head -n1)
+            if [ -n "$prev" ] && [ "$(git rev-parse "$prev^{commit}")" = "$(git rev-parse HEAD)" ]; then
+              echo "自上次 nightly（$prev）以来没有新提交，跳过"
+              skip=true
+            fi
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          echo "本次 tag=$tag skip=$skip"
+
+  # 仅 Windows，三种架构并行打包为自包含单文件 exe
+  build:
+    needs: check
+    if: needs.check.outputs.skip == 'false'
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [win-x64, win-x86, win-arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish (${{ matrix.rid }})
+        shell: pwsh
+        run: |
+          dotnet publish FluentUSB.csproj `
+            -c Release `
+            -r ${{ matrix.rid }} `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=none `
+            -o "out/${{ matrix.rid }}"
+
+          $exe = "out/${{ matrix.rid }}/FluentUSB.exe"
+          if (!(Test-Path $exe)) { throw "未生成 $exe" }
+          Get-ChildItem "out/${{ matrix.rid }}" -Filter *.pdb | Remove-Item -Force
+          Rename-Item $exe "FluentUSB-${{ needs.check.outputs.tag }}-${{ matrix.rid }}.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.rid }}
+          path: out/${{ matrix.rid }}/FluentUSB-*.exe
+          if-no-files-found: error
+
+  # 汇总三个包并创建 Release
+  release:
+    needs: [check, build]
+    if: needs.check.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: downloads
+
+      - name: Build release notes
+        shell: bash
+        run: |
+          git fetch --tags --force --quiet
+          prev=$(git tag -l 'Nightly-*' | sort -r | head -n1)
+          {
+            echo "自动构建的 nightly 版本，仅包含 Windows 版本（自包含，无需安装 .NET 运行时）。"
+            echo
+            echo "## 更新日志"
+            echo
+            if [ -n "$prev" ]; then
+              echo "自 \`$prev\` 以来的提交："
+              echo
+              git log "$prev..HEAD" --no-merges --pretty=format:'- %s (%h)'
+            else
+              echo "首次 nightly 构建，包含全部提交："
+              echo
+              git log --no-merges --pretty=format:'- %s (%h)'
+            fi
+            echo
+            echo
+            echo "## 下载"
+            echo
+            echo "- x64（Intel/AMD 64 位）：\`FluentUSB-${{ needs.check.outputs.tag }}-win-x64.exe\`"
+            echo "- x86（32 位）：\`FluentUSB-${{ needs.check.outputs.tag }}-win-x86.exe\`"
+            echo "- arm64（Windows on ARM）：\`FluentUSB-${{ needs.check.outputs.tag }}-win-arm64.exe\`"
+          } > notes.md
+          cat notes.md
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release create "${{ needs.check.outputs.tag }}" \
+            --target "$GITHUB_SHA" \
+            --title "${{ needs.check.outputs.tag }}" \
+            --notes-file notes.md \
+            --prerelease \
+            downloads/*/*.exe
