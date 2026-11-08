@@ -4,7 +4,13 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <Version>0.1.0</Version>
+    <Product>FluentUSB</Product>
+    <AssemblyTitle>FluentUSB</AssemblyTitle>
+    <Company>FluentUSB</Company>
+    <Description>常驻桌面的 U 盘助手</Description>
   </PropertyGroup>
 
   <ItemGroup>

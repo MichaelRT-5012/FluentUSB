@@ -8,10 +8,10 @@
         MinWidth="400" MinHeight="260"
         x:Class="FluentUSB.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/app.ico"
         Title="FluentUSB"
         Background="Transparent"
-        TransparencyLevelHint="AcrylicBlur, Blur"
+        TransparencyLevelHint="Transparent"
         TextOptions.TextRenderingMode="Antialias">
 
     <Design.DataContext>
@@ -35,8 +35,8 @@
         </Style>
     </Window.Styles>
 
-    <!-- 卡片底色叠在亚克力之上：避免白色背景下文字看不清 -->
-    <Border Background="{DynamicResource CardSurfaceBrush}">
+    <!-- 卡片底色叠在系统背景效果之上：避免壁纸背景下文字看不清 -->
+    <Border x:Name="Surface" Background="{DynamicResource CardSurfaceBrush}">
         <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20,18,20,14">
 
             <!-- 标题 + 监听状态 -->
@@ -45,15 +45,26 @@
                     <TextBlock Text="{Binding AppName}" FontSize="20" FontWeight="SemiBold"/>
                     <TextBlock Text="{Binding Subtitle}" FontSize="12" Opacity="0.6"/>
                 </StackPanel>
-                <Border Grid.Column="1" VerticalAlignment="Center" CornerRadius="10"
-                        Padding="9,4" Background="{DynamicResource CardHoverBrush}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <Ellipse Width="6" Height="6" VerticalAlignment="Center"
-                                 Fill="{DynamicResource SystemControlBackgroundAccentBrush}"/>
-                        <TextBlock Text="{Binding StatusText}" FontSize="11" Opacity="0.85"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Border CornerRadius="10"
+                            Padding="9,4" Background="{DynamicResource CardHoverBrush}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Ellipse Width="6" Height="6" VerticalAlignment="Center"
+                                     Fill="{DynamicResource SystemControlBackgroundAccentBrush}"/>
+                            <TextBlock Text="{Binding StatusText}" FontSize="11" Opacity="0.85"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <Button Width="30" Height="30" Padding="0"
+                            Background="Transparent" BorderThickness="0"
+                            Cursor="Hand" ToolTip.Tip="设置"
+                            Click="OnSettingsClick">
+                        <TextBlock Text="&#xE713;"
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="13" Opacity="0.65"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Button>
+                </StackPanel>
             </Grid>
 
             <TextBlock Grid.Row="1" Margin="2,18,0,8" Text="已连接的 U 盘"

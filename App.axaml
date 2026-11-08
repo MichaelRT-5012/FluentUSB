@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="FluentUSB.App"
              xmlns:local="using:FluentUSB">
-             <!-- 主题由 App.axaml.cs 依据 UiOptions.Theme 设置（预留深浅切换） -->
+             <!-- 主题与窗口背景由设置页控制（%AppData%\FluentUSB\settings.json） -->
 
     <!--
         亚克力窗口的自定义卡片底色。
@@ -16,11 +16,17 @@
                     <SolidColorBrush x:Key="CardSurfaceBrush" Color="#CC171717" />
                     <SolidColorBrush x:Key="CardBorderBrush" Color="#26FFFFFF" />
                     <SolidColorBrush x:Key="CardHoverBrush" Color="#1FFFFFFF" />
+                    <SolidColorBrush x:Key="CardLayerBrush" Color="#1AFFFFFF" />
+                    <SolidColorBrush x:Key="RowHighlightBrush" Color="#30FFFFFF" />
+                    <SolidColorBrush x:Key="NavSelectedBrush" Color="#3D4C9AFF" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Light">
                     <SolidColorBrush x:Key="CardSurfaceBrush" Color="#E6F9F9F9" />
                     <SolidColorBrush x:Key="CardBorderBrush" Color="#14000000" />
                     <SolidColorBrush x:Key="CardHoverBrush" Color="#12000000" />
+                    <SolidColorBrush x:Key="CardLayerBrush" Color="#12000000" />
+                    <SolidColorBrush x:Key="RowHighlightBrush" Color="#22000000" />
+                    <SolidColorBrush x:Key="NavSelectedBrush" Color="#1F0067C0" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
@@ -34,14 +40,15 @@
         <FluentTheme />
     </Application.Styles>
 
-    <!-- 托盘图标：左键 Clicked 恢复主窗口，右键弹出菜单。正式图标 M5 替换 -->
+    <!-- 托盘图标：左键 Clicked 恢复主窗口，右键弹出菜单 -->
     <TrayIcon.Icons>
         <TrayIcons>
-            <TrayIcon Icon="/Assets/avalonia-logo.ico"
+            <TrayIcon Icon="/Assets/app.ico"
                       ToolTipText="FluentUSB"
                       Clicked="OnTrayIconClicked">
                 <TrayIcon.Menu>
                     <NativeMenu>
+                        <NativeMenuItem Header="设置" Click="OnSettingsMenuClick" />
                         <NativeMenuItem Header="显示主窗口" Click="OnShowMainWindowClick" />
                         <NativeMenuItem Header="退出" Click="OnExitClick" />
                     </NativeMenu>

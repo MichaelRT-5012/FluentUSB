@@ -1,10 +1,14 @@
 using System;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using FluentUSB.Models;
+using FluentUSB.Services;
 using FluentUSB.ViewModels;
 
 namespace FluentUSB.Views;
@@ -12,9 +16,9 @@ namespace FluentUSB.Views;
 /// <summary>
 /// U 盘插入提示弹窗：展示盘名/盘符/容量，点击一键打开。
 /// 倒计时结束自动关闭（鼠标悬停暂停倒计时）；
-/// 弹出位置由 UiOptions.PopupPosition 控制（默认屏幕左下角）。
+/// 弹出位置与停留时长由设置页控制（默认屏幕左下角、8 秒）。
 /// </summary>
-public partial class UsbToastWindow : Window
+public partial class UsbToastWindow : Window, IAppearanceHost
 {
     private readonly DispatcherTimer _countdownTimer;
     private readonly TimeSpan _duration;
@@ -32,50 +36,110 @@ public partial class UsbToastWindow : Window
     {
         InitializeComponent();
 
-        // 透明度级别集中由 UiOptions 控制（与主窗口一致）
-        TransparencyLevelHint = UiOptions.TransparencyHint;
         DataContext = new UsbDriveViewModel(drive);
         DriveLetter = drive.DriveLetter;
 
-        _duration = UiOptions.PopupDuration;
+        var settings = SettingsStore.Current;
+        _duration = TimeSpan.FromSeconds(settings.PopupDurationSeconds);
         _remaining = _duration;
         _countdownTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _countdownTimer.Tick += OnCountdownTick;
 
         Opened += OnWindowOpened;
+        Closed += (_, _) =>
+        {
+            _countdownTimer.Stop();
+            SettingsStore.ToastChanged -= OnToastAppearanceChanged;
+        };
+        SettingsStore.ToastChanged += OnToastAppearanceChanged;
+        ActualThemeVariantChanged += (_, _) => ApplyToastAppearance();
         PointerPressed += OnToastPointerPressed;
         PointerEntered += (_, _) => _paused = true;
         PointerExited += (_, _) => _paused = false;
     }
 
+    public Border? SurfaceHost => RootCard;
+
+    public bool UsesToastAppearance => true;
+
+    // 弹窗打开期间改「插入弹窗外观」，让当前弹窗即时刷新（设置页的「预览」也靠它）
+    private void OnToastAppearanceChanged() => ApplyToastAppearance();
+
+    /// <summary>
+    /// 按「插入弹窗外观」设置调整卡片形态并重新应用背景：
+    /// 卡片式 = 圆角卡片 + 自绘阴影；整窗式 = 窗口与卡片等大，交给系统材质与圆角。
+    /// </summary>
+    public void ApplyToastAppearance()
+    {
+        var windowStyle = SettingsStore.Current.ToastStyle == ToastStyle.Window;
+
+        if (windowStyle)
+        {
+            // 整窗式没有余量画自绘阴影，边框也交给系统材质
+            RootCard.Margin = default;
+            RootCard.CornerRadius = default;
+            RootCard.BorderThickness = default;
+            RootCard.BoxShadow = default;
+        }
+        else
+        {
+            RootCard.Margin = new Thickness(8);
+            RootCard.CornerRadius = new CornerRadius(14);
+            RootCard.BorderThickness = new Thickness(1);
+            RootCard.BoxShadow = BoxShadows.Parse("0 10 30 -12 #80000000");
+        }
+
+        RootCard.Classes.Set("Static", windowStyle);
+
+        if (TryGetPlatformHandle() is { } handle && handle.Handle != IntPtr.Zero)
+            BackdropNative.SetRoundedCorners(handle.Handle, windowStyle);
+
+        BackdropService.Apply(this);
+    }
+
     /// <summary>该弹窗对应的盘符（如 "D:"），用于去重与拔出时回收。</summary>
     public string DriveLetter { get; }
 
-    /// <summary>同角落已有弹窗时的堆叠序号（0 表示贴边），由 App 在显示前设置。</summary>
-    public int SlotIndex { get; set; }
+    /// <summary>同角落已有弹窗时的堆叠序号（0 表示贴边），由 App 在显示或重排时设置。</summary>
+    public int SlotIndex { get; private set; }
+
+    /// <summary>更新堆叠序号；窗口已显示时立即重新定位。</summary>
+    public void SetSlot(int slot)
+    {
+        SlotIndex = slot;
+        if (IsVisible)
+            PositionOnScreen();
+    }
 
     private void OnWindowOpened(object? sender, EventArgs e)
     {
+        // 卡片四周留了 8px 阴影边距；卡片式只画底色，整窗式才套用系统材质
+        ApplyToastAppearance();
         PositionOnScreen();
         // 延后一帧再切换到 Show 状态，触发入场动画（淡入 + 上浮）
         Dispatcher.UIThread.Post(() => RootCard.Classes.Add("Show"), DispatcherPriority.Render);
         _countdownTimer.Start();
     }
 
-    /// <summary>按 UiOptions.PopupPosition 把弹窗放到主屏工作区的角落（默认左下角）。</summary>
+    /// <summary>
+    /// 按设置里的停靠角落把弹窗放到某个屏幕工作区（默认左下角）。
+    /// 优先使用鼠标所在屏幕，避免老师用扩展屏时弹窗出现在看不见的主屏。
+    /// </summary>
     private void PositionOnScreen()
     {
-        var screen = Screens.Primary ?? (Screens.All.Count > 0 ? Screens.All[0] : null);
+        var screen = FindTargetScreen();
         if (screen is null) return;
 
         var area = screen.WorkingArea;
         var scale = screen.Scaling;
         var width = (int)(Width * scale);
         var height = (int)(Height * scale);
-        var margin = UiOptions.PopupMargin;
 
-        var left = UiOptions.PopupPosition is PopupCorner.BottomLeft or PopupCorner.TopLeft;
-        var bottom = UiOptions.PopupPosition is PopupCorner.BottomLeft or PopupCorner.BottomRight;
+        var settings = SettingsStore.Current;
+        var margin = settings.PopupMargin;
+
+        var left = settings.PopupPosition is PopupCorner.BottomLeft or PopupCorner.TopLeft;
+        var bottom = settings.PopupPosition is PopupCorner.BottomLeft or PopupCorner.BottomRight;
 
         // 多个 U 盘同时插入时向上（或向下）堆叠，避免重叠
         var slotOffset = SlotIndex * (int)((Height + 8) * scale);
@@ -83,6 +147,26 @@ public partial class UsbToastWindow : Window
         Position = new PixelPoint(
             left ? area.X + margin : area.Right - width - margin,
             bottom ? area.Bottom - height - margin - slotOffset : area.Y + margin + slotOffset);
+    }
+
+    /// <summary>鼠标所在的屏幕；取不到时回退到主屏。</summary>
+    private Screen? FindTargetScreen()
+    {
+        if (TryGetCursorPosition(out var point))
+        {
+            try
+            {
+                var screen = Screens.ScreenFromPoint(point);
+                if (screen is not null)
+                    return screen;
+            }
+            catch (Exception)
+            {
+                // 坐标不在任何屏幕内时回退主屏
+            }
+        }
+
+        return Screens.Primary ?? (Screens.All.Count > 0 ? Screens.All[0] : null);
     }
 
     private void OnCountdownTick(object? sender, EventArgs e)
@@ -118,4 +202,26 @@ public partial class UsbToastWindow : Window
         RootCard.Classes.Remove("Show");
         DispatcherTimer.RunOnce(Close, TimeSpan.FromMilliseconds(240));
     }
+
+    private static bool TryGetCursorPosition(out PixelPoint point)
+    {
+        if (GetCursorPos(out var native))
+        {
+            point = new PixelPoint(native.X, native.Y);
+            return true;
+        }
+
+        point = default;
+        return false;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out NativePoint point);
 }

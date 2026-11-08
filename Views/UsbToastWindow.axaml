@@ -15,6 +15,7 @@
         ShowInTaskbar="False"
         ShowActivated="False"
         Background="Transparent"
+        TransparencyLevelHint="Transparent"
         TextOptions.TextRenderingMode="Antialias"
         Cursor="Hand">
 
@@ -36,6 +37,10 @@
         </Style>
         <Style Selector="Border#RootCard.Show:pointerover">
             <Setter Property="RenderTransform" Value="translateY(0px) scale(1.015)"/>
+        </Style>
+        <!-- 整窗式下窗口即卡片，位移会露出窗口空白，改为只做淡入 -->
+        <Style Selector="Border#RootCard.Static">
+            <Setter Property="RenderTransform" Value="translateY(0px)"/>
         </Style>
     </Window.Styles>
 

@@ -1,0 +1,23 @@
+name: Build
+
+# 每次推送与 PR 都做一次编译校验，nightly 只负责打包发布
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Build
+        run: dotnet build FluentUSB.csproj -c Release --nologo
