@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="32"
+             x:Class="FluentUSB.Controls.ValueSlider"
+             x:Name="Root"
+             ClipToBounds="False">
+
+    <Grid>
+        <Slider x:Name="Inner"
+                Minimum="{Binding Minimum, ElementName=Root}"
+                Maximum="{Binding Maximum, ElementName=Root}"
+                Value="{Binding Value, ElementName=Root, Mode=TwoWay}"
+                TickFrequency="{Binding TickFrequency, ElementName=Root}"
+                IsSnapToTickEnabled="{Binding IsSnapToTickEnabled, ElementName=Root}"/>
+
+        <!-- 拖动时跟随滑块的小圆角数值框 -->
+        <Canvas IsHitTestVisible="False">
+            <Border x:Name="Bubble"
+                    Opacity="0"
+                    Background="{DynamicResource SystemControlBackgroundAccentBrush}"
+                    CornerRadius="4" Padding="6,2"
+                    VerticalAlignment="Top" HorizontalAlignment="Left">
+                <Border.Transitions>
+                    <Transitions>
+                        <DoubleTransition Property="Opacity" Duration="00:00:00.12"/>
+                    </Transitions>
+                </Border.Transitions>
+                <TextBlock x:Name="BubbleText" FontSize="11" FontWeight="SemiBold"
+                           Foreground="#FFFFFFFF"/>
+            </Border>
+        </Canvas>
+    </Grid>
+</UserControl>

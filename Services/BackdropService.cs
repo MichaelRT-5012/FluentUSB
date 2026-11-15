@@ -238,7 +238,7 @@ internal static class BackdropService
     }
 
     private static Color SurfaceColor() =>
-        IsDark() ? Color.FromRgb(0x17, 0x17, 0x17) : Color.FromRgb(0xF9, 0xF9, 0xF9);
+        IsDark() ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xF3, 0xF3, 0xF3);
 
     public static bool IsDark() =>
         Application.Current?.ActualThemeVariant == ThemeVariant.Dark;

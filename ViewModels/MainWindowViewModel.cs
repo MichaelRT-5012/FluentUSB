@@ -27,7 +27,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     /// <summary>右上角监听状态文案。</summary>
     public string StatusText =>
-        HasDrives ? $"正在监听 · 已连接 {DriveList.Count} 个 U 盘" : "正在监听 U 盘插入";
+        HasDrives ? $"已连接 {DriveList.Count} 个 U 盘" : "尚未连接 U 盘";
 
     /// <summary>
     /// 重新枚举当前在位的 U 盘并校正列表。

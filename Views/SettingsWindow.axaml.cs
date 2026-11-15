@@ -1,11 +1,15 @@
 using System;
 using System.ComponentModel;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Transformation;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using FluentUSB.Models;
 using FluentUSB.Services;
 using FluentUSB.ViewModels;
@@ -15,10 +19,9 @@ namespace FluentUSB.Views;
 /// <summary>外观与弹窗设置窗口（从托盘菜单或主窗口齿轮按钮打开）。</summary>
 public partial class SettingsWindow : Window, IAppearanceHost
 {
-    // 导航项高度 38 + 间距 2
-    private const double NavItemStride = 40;
-
     private bool _fitted;
+    private int _sectionIndex;
+    private CancellationTokenSource? _sectionHideCts;
     private SettingsViewModel? _viewModel;
     private readonly TranslateTransform _indicatorTransform = new();
     private readonly DispatcherTimer _indicatorTimer;
@@ -40,7 +43,8 @@ public partial class SettingsWindow : Window, IAppearanceHost
             Dispatcher.UIThread.Post(FitToScreen, DispatcherPriority.Loaded);
             BackdropService.Apply(this);
             AnimateSection(AppearanceSection, 10);
-            MoveIndicatorToCurrent(immediate: true);
+            Dispatcher.UIThread.Post(() => MoveIndicatorToCurrent(immediate: true),
+                DispatcherPriority.Loaded);
         };
 
         ActualThemeVariantChanged += (_, _) => BackdropService.Apply(this);
@@ -56,23 +60,73 @@ public partial class SettingsWindow : Window, IAppearanceHost
 
         _viewModel = DataContext as SettingsViewModel;
         if (_viewModel is not null)
+        {
+            _sectionIndex = _viewModel.SectionIndex;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        }
     }
 
-    // 分类切换时让新内容淡入并轻微右移归位，避免生硬闪现
+    // 分类切换：旧内容向切换的反方向淡出，新内容从切换方向进入
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(SettingsViewModel.SectionIndex) || _viewModel is null)
             return;
 
-        AnimateSection(_viewModel.IsAboutSection ? AboutSection : AppearanceSection);
+        var target = _viewModel.SectionIndex;
+        TransitionSections(_sectionIndex, target);
+        _sectionIndex = target;
+
         MoveIndicatorToCurrent(immediate: false);
+    }
+
+    /// <summary>按切换方向做交叉过渡，避免内容生硬替换。</summary>
+    private void TransitionSections(int from, int to)
+    {
+        if (from == to)
+            return;
+
+        var outgoing = from == 1 ? AboutSection : AppearanceSection;
+        var incoming = to == 1 ? AboutSection : AppearanceSection;
+        var direction = to > from ? 1 : -1;
+        const double offset = 12;
+
+        ContentScroller.Offset = default;
+
+        outgoing.Opacity = 0;
+        outgoing.RenderTransform = TransformOperations.Parse($"translateY({-direction * offset:0}px)");
+
+        incoming.IsVisible = true;
+        incoming.Opacity = 0;
+        incoming.RenderTransform = TransformOperations.Parse($"translateY({direction * offset:0}px)");
+
+        // 等一帧让起始状态生效，再过渡到终态
+        Dispatcher.UIThread.Post(() =>
+        {
+            incoming.Opacity = 1;
+            incoming.RenderTransform = TransformOperations.Parse("translateY(0px)");
+        }, DispatcherPriority.Background);
+
+        // 淡出结束后隐藏旧内容；被快速切回时取消，避免误隐藏
+        _sectionHideCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _sectionHideCts = cts;
+        _ = Task.Delay(240, cts.Token).ContinueWith(task =>
+        {
+            if (task.IsCanceled)
+                return;
+
+            Dispatcher.UIThread.Post(() => outgoing.IsVisible = false);
+        }, TaskScheduler.Default);
     }
 
     /// <summary>把选中指示条滑到当前分类（弹簧阻尼，带一点回弹）。</summary>
     private void MoveIndicatorToCurrent(bool immediate)
     {
-        _indicatorTarget = (_viewModel?.SectionIndex ?? 0) * NavItemStride;
+        var target = (_viewModel?.SectionIndex ?? 0) == 1 ? NavAbout : NavAppearance;
+
+        // 按实际布局取目标项中心，导航项之间插入分组标题也不会错位
+        var center = target.TranslatePoint(new Point(0, target.Bounds.Height / 2), NavLayer)?.Y ?? 0;
+        _indicatorTarget = Math.Max(0, center - NavIndicator.Height / 2);
 
         if (immediate)
         {
@@ -86,18 +140,25 @@ public partial class SettingsWindow : Window, IAppearanceHost
 
     private void OnIndicatorTick(object? sender, EventArgs e)
     {
-        const double dt = 0.016;
-        const double stiffness = 240;
-        const double damping = 17;
+        // 欠阻尼弹簧：略快于临界阻尼，越过目标约 8% 后回弹稳定（约 450ms）
+        const double stiffness = 380;
+        const double damping = 24;
 
-        // 欠阻尼弹簧：先快速滑向目标，越过少许后回弹稳定
+        // 分小步积分，高刷新率屏幕下轨迹更平滑
+        const int steps = 4;
+        const double dt = 0.016 / steps;
+
         var y = _indicatorTransform.Y;
-        var acceleration = (_indicatorTarget - y) * stiffness - _indicatorVelocity * damping;
-        _indicatorVelocity += acceleration * dt;
-        var next = y + _indicatorVelocity * dt;
-        _indicatorTransform.Y = next;
+        for (var i = 0; i < steps; i++)
+        {
+            var acceleration = (_indicatorTarget - y) * stiffness - _indicatorVelocity * damping;
+            _indicatorVelocity += acceleration * dt;
+            y += _indicatorVelocity * dt;
+        }
 
-        if (Math.Abs(_indicatorTarget - next) < 0.4 && Math.Abs(_indicatorVelocity) < 2)
+        _indicatorTransform.Y = y;
+
+        if (Math.Abs(_indicatorTarget - y) < 0.3 && Math.Abs(_indicatorVelocity) < 1.5)
         {
             _indicatorTransform.Y = _indicatorTarget;
             _indicatorVelocity = 0;
@@ -108,13 +169,13 @@ public partial class SettingsWindow : Window, IAppearanceHost
     private static void AnimateSection(Control section, double offset = 14)
     {
         section.Opacity = 0;
-        section.RenderTransform = TransformOperations.Parse($"translateX({offset:0}px)");
+        section.RenderTransform = TransformOperations.Parse($"translateY({offset:0}px)");
 
         // 等一帧，让初始状态生效后再过渡到终态
         Dispatcher.UIThread.Post(() =>
         {
             section.Opacity = 1;
-            section.RenderTransform = TransformOperations.Parse("translateX(0px)");
+            section.RenderTransform = TransformOperations.Parse("translateY(0px)");
         }, DispatcherPriority.Background);
     }
 

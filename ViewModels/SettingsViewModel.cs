@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FluentUSB.Models;
@@ -86,6 +87,19 @@ public partial class SettingsViewModel : ObservableObject
             ? "版本 0.1.0"
             : $"版本 {version.Major}.{version.Minor}.{Math.Max(0, version.Build)}";
 
+        // 便于确认当前运行的是哪次构建
+        try
+        {
+            var exe = Environment.ProcessPath;
+            BuildText = exe is null
+                ? "未知"
+                : $"构建于 {File.GetLastWriteTime(exe):yyyy-MM-dd HH:mm}";
+        }
+        catch (IOException)
+        {
+            BuildText = "未知";
+        }
+
         _surfaceOpacityPercent = Math.Round(settings.SurfaceOpacity * 100);
         _toastOpacityPercent = Math.Round(settings.ToastOpacity * 100);
         _toastStyleIndex = (int)settings.ToastStyle;
@@ -123,6 +137,9 @@ public partial class SettingsViewModel : ObservableObject
     public string VersionText { get; }
 
     public string SystemText { get; }
+
+    /// <summary>当前可执行文件的构建时间，便于确认是否运行的是最新版本。</summary>
+    public string BuildText { get; }
 
     public string SettingsFilePath { get; }
 

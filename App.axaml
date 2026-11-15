@@ -1,32 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="FluentUSB.App"
-             xmlns:local="using:FluentUSB">
+             xmlns:local="using:FluentUSB"
+             xmlns:controls="using:FluentUSB.Controls">
              <!-- 主题与窗口背景由设置页控制（%AppData%\FluentUSB\settings.json） -->
 
     <!--
-        亚克力窗口的自定义卡片底色。
-        仅依赖系统亚克力时，背景为亮色（白色壁纸/浅色窗口）会让文字与背景对比度不足；
-        这里在亚克力之上叠一层高不透明度底色，任何背景都可读，同时仍透出少量模糊质感。
+        颜色令牌尽量沿用 WinUI 3 的同名资源与取值（Windows 11 系统应用就是这一套），
+        这样圆角、描边、悬停与文字层级能和系统界面保持一致，而不是自拟配色。
     -->
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.ThemeDictionaries>
-                <ResourceDictionary x:Key="Dark">
-                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#CC171717" />
-                    <SolidColorBrush x:Key="CardBorderBrush" Color="#26FFFFFF" />
-                    <SolidColorBrush x:Key="CardHoverBrush" Color="#1FFFFFFF" />
-                    <SolidColorBrush x:Key="CardLayerBrush" Color="#1AFFFFFF" />
-                    <SolidColorBrush x:Key="RowHighlightBrush" Color="#30FFFFFF" />
-                    <SolidColorBrush x:Key="NavSelectedBrush" Color="#3D4C9AFF" />
-                </ResourceDictionary>
                 <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#E6F9F9F9" />
-                    <SolidColorBrush x:Key="CardBorderBrush" Color="#14000000" />
-                    <SolidColorBrush x:Key="CardHoverBrush" Color="#12000000" />
-                    <SolidColorBrush x:Key="CardLayerBrush" Color="#12000000" />
-                    <SolidColorBrush x:Key="RowHighlightBrush" Color="#22000000" />
-                    <SolidColorBrush x:Key="NavSelectedBrush" Color="#1F0067C0" />
+                    <!-- 窗口底色（无系统材质时的纯色底） -->
+                    <SolidColorBrush x:Key="WindowSurfaceBrush" Color="#F3F3F3" />
+                    <!-- 侧边栏/导航背景层 -->
+                    <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#4CFFFFFF" />
+                    <!-- 设置卡片 -->
+                    <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#B3FFFFFF" />
+                    <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#80F6F6F6" />
+                    <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#0F000000" />
+                    <!-- 控件填充与描边 -->
+                    <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#B3FFFFFF" />
+                    <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#80F9F9F9" />
+                    <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#0F000000" />
+                    <!-- 文字层级 -->
+                    <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#E4000000" />
+                    <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#9E000000" />
+                    <SolidColorBrush x:Key="TextFillColorTertiaryBrush" Color="#72000000" />
+                    <!-- 悬停/选中等弱背景 -->
+                    <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#09000000" />
+                    <SolidColorBrush x:Key="DividerStrokeColorDefaultBrush" Color="#0F000000" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="WindowSurfaceBrush" Color="#202020" />
+                    <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#4C3A3A3A" />
+                    <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#0DFFFFFF" />
+                    <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#08FFFFFF" />
+                    <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#19000000" />
+                    <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#0FFFFFFF" />
+                    <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#15FFFFFF" />
+                    <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#12FFFFFF" />
+                    <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#C5FFFFFF" />
+                    <SolidColorBrush x:Key="TextFillColorTertiaryBrush" Color="#87FFFFFF" />
+                    <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#0FFFFFFF" />
+                    <SolidColorBrush x:Key="DividerStrokeColorDefaultBrush" Color="#15FFFFFF" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
@@ -38,6 +59,63 @@
 
     <Application.Styles>
         <FluentTheme />
+
+        <!-- 全局统一：字体、圆角、字号与最小点击尺寸（触屏也能稳定点中） -->
+        <Style Selector="Window">
+            <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/>
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        <!-- 统一的交互反馈：悬停/按下的底色按 WinUI 的 167ms 平滑过渡 -->
+        <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="00:00:00.167"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ComboBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="00:00:00.167"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ComboBox">
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="controls:ComboPopupMotion.Enabled" Value="True"/>
+        </Style>
+        <!-- 下拉项：与 Win11 弹出层一致，圆角 + 内缩 2px -->
+        <Style Selector="ComboBoxItem">
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Margin" Value="2,1"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        <!-- 下拉浮层本体：8px 圆角（Win11 浮层规格） -->
+        <Style Selector="ComboBox /template/ Border#PopupBorder">
+            <Setter Property="CornerRadius" Value="8"/>
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        <Style Selector="CheckBox, RadioButton">
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="ToggleSwitch">
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
     </Application.Styles>
 
     <!-- 托盘图标：左键 Clicked 恢复主窗口，右键弹出菜单 -->

@@ -84,9 +84,9 @@ public partial class UsbToastWindow : Window, IAppearanceHost
         else
         {
             RootCard.Margin = new Thickness(8);
-            RootCard.CornerRadius = new CornerRadius(14);
+            RootCard.CornerRadius = new CornerRadius(8);
             RootCard.BorderThickness = new Thickness(1);
-            RootCard.BoxShadow = BoxShadows.Parse("0 10 30 -12 #80000000");
+            RootCard.BoxShadow = BoxShadows.Parse("0 8 24 -8 #66000000");
         }
 
         RootCard.Classes.Set("Static", windowStyle);
