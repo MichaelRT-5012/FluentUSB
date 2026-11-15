@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # 判定本次是否有新提交、今天是否已经发过 nightly
+  # 判定今天是否已有 nightly，以及自上次手动发布的 release 以来是否有新提交
   check:
     runs-on: ubuntu-latest
     outputs:
@@ -27,6 +27,8 @@ jobs:
 
       - id: decide
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git fetch --tags --force --quiet
           tag="Nightly-$(TZ=Asia/Shanghai date +%Y-%m-%d)"
@@ -37,10 +39,25 @@ jobs:
             echo "今天的 nightly 已发布：$tag"
             skip=true
           else
-            prev=$(git tag -l 'Nightly-*' | sort -r | head -n1)
-            if [ -n "$prev" ] && [ "$(git rev-parse "$prev^{commit}")" = "$(git rev-parse HEAD)" ]; then
-              echo "自上次 nightly（$prev）以来没有新提交，跳过"
-              skip=true
+            # 基线：最近一次手动发布的 release（约定 nightly 的 tag 均以 Nightly- 开头，
+            # 其余 tag 视为手动发布）。手动发布过就只跟它比，避免发布完立刻又出一个内容相同的 nightly。
+            base=$(gh release list --limit 100 --json tagName,createdAt \
+              --jq '[.[] | select(.tagName | test("^Nightly-") | not)] | sort_by(.createdAt) | last | .tagName // ""')
+            base_label="上次手动发布"
+
+            # 还没有任何手动发布过的 release 时，退回跟上次 nightly 比较
+            if [ -z "$base" ]; then
+              base=$(git tag -l 'Nightly-*' | sort -r | head -n1)
+              base_label="上次 nightly"
+            fi
+
+            if [ -n "$base" ]; then
+              if [ "$(git rev-list --count "$base..HEAD")" -eq 0 ]; then
+                echo "自$base_label（$base）以来没有新提交，跳过"
+                skip=true
+              else
+                echo "自$base_label（$base）以来有 $(git rev-list --count "$base..HEAD") 个新提交"
+              fi
             fi
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
