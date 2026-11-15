@@ -24,6 +24,13 @@ public static class ComboPopupMotion
 
     private const double HiddenScale = 0.9;
 
+    // 缩放原点固定在顶部中心，避免每次展开都重新构造
+    private static readonly RelativePoint TopCenterOrigin = new(0.5, 0, RelativeUnit.Relative);
+
+    // 关闭状态的缩放变换只解析一次，避免每次关闭都走字符串解析
+    private static readonly TransformOperations HiddenTransform =
+        TransformOperations.Parse($"scale({HiddenScale})");
+
     public static readonly AttachedProperty<bool> EnabledProperty =
         AvaloniaProperty.RegisterAttached<ComboBox, bool>("Enabled", typeof(ComboPopupMotion));
 
@@ -128,7 +135,7 @@ public static class ComboPopupMotion
                 return;
 
             var scale = new ScaleTransform(HiddenScale, HiddenScale);
-            content.RenderTransformOrigin = new RelativePoint(0.5, 0, RelativeUnit.Relative);
+            content.RenderTransformOrigin = TopCenterOrigin;
             content.RenderTransform = scale;
             content.Opacity = 0;
 
@@ -173,8 +180,8 @@ public static class ComboPopupMotion
         if (popup.Child is not Control content)
             return;
 
-        content.RenderTransformOrigin = new RelativePoint(0.5, 0, RelativeUnit.Relative);
+        content.RenderTransformOrigin = TopCenterOrigin;
         content.Opacity = 0;
-        content.RenderTransform = TransformOperations.Parse($"scale({HiddenScale})");
+        content.RenderTransform = HiddenTransform;
     }
 }

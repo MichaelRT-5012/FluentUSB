@@ -15,6 +15,13 @@ internal static class Log
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "FluentUSB", "logs");
 
+    static Log()
+    {
+        // 启动时预创建目录，避免每次写日志都判断
+        try { Directory.CreateDirectory(LogDirectory); }
+        catch { /* 目录创建失败时 Write 内还会再试一次 */ }
+    }
+
     /// <summary>日志目录（设置页「关于」中展示）。</summary>
     public static string DirectoryPath => LogDirectory;
 
@@ -29,8 +36,9 @@ internal static class Log
     {
         try
         {
-            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{level}] {message}{Environment.NewLine}";
-            var file = Path.Combine(LogDirectory, $"fluentusb-{DateTime.Now:yyyyMMdd}.log");
+            var now = DateTime.Now;
+            var line = $"{now:yyyy-MM-dd HH:mm:ss.fff} [{level}] {message}{Environment.NewLine}";
+            var file = Path.Combine(LogDirectory, $"fluentusb-{now:yyyyMMdd}.log");
 
             lock (Gate)
             {

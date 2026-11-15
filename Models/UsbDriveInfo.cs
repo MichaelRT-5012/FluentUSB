@@ -23,16 +23,17 @@ public sealed record UsbDriveInfo(
     /// <summary>容量摘要，供弹窗展示，如 "总共 14.9 GB · 可用 3.2 GB"。</summary>
     public string SizeSummary => $"总共 {FormatBytes(TotalSize)} · 可用 {FormatBytes(FreeSpace)}";
 
+    private static readonly string[] ByteUnits = ["B", "KB", "MB", "GB", "TB"];
+
     private static string FormatBytes(long bytes)
     {
-        string[] units = ["B", "KB", "MB", "GB", "TB"];
         double size = bytes;
         var unit = 0;
-        while (size >= 1024 && unit < units.Length - 1)
+        while (size >= 1024 && unit < ByteUnits.Length - 1)
         {
             size /= 1024;
             unit++;
         }
-        return $"{size:0.#} {units[unit]}";
+        return $"{size:0.#} {ByteUnits[unit]}";
     }
 }

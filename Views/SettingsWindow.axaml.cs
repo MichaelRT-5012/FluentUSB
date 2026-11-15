@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -9,7 +8,6 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Transformation;
 using Avalonia.Threading;
-using Avalonia.VisualTree;
 using FluentUSB.Models;
 using FluentUSB.Services;
 using FluentUSB.ViewModels;

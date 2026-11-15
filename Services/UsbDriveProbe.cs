@@ -66,14 +66,15 @@ internal static class UsbDriveProbe
             if (!IsUsbStorage(drive))
                 return UsbProbeResult.NotUsb;
 
-            if (!drive.IsReady || drive.TotalSize <= 0)
-                return UsbProbeResult.NotReady;
-
-            return UsbProbeResult.Ready(CreateSnapshot(drive));
+            // TryCreate 已处理 IsReady/TotalSize 检查与读取异常
+            var snapshot = TryCreate(drive);
+            return snapshot is null
+                ? UsbProbeResult.NotReady
+                : UsbProbeResult.Ready(snapshot);
         }
         catch (Exception)
         {
-            // 读取属性期间被拔出会抛 IO 异常，按"未就绪"重试即可
+            // 枚举驱动器或判断总线类型期间被拔出会抛异常，按"未就绪"重试即可
             return UsbProbeResult.NotReady;
         }
     }
