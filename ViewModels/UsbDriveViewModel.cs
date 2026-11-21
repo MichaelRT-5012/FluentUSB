@@ -22,6 +22,7 @@ public partial class UsbDriveViewModel : ViewModelBase
 
     /// <summary>
     /// 打开 U 盘。M1 临时使用资源管理器，M2 将替换为内建文件管理器。
+    /// 直接用盘符根目录作为 FileName，避免拼 "D:\" 时末尾反斜杠破坏引号转义。
     /// </summary>
     [RelayCommand]
     private void OpenDrive()
@@ -30,8 +31,7 @@ public partial class UsbDriveViewModel : ViewModelBase
         {
             Process.Start(new ProcessStartInfo
             {
-                FileName = "explorer.exe",
-                Arguments = $"\"{Drive.RootPath}\"",
+                FileName = Drive.RootPath,
                 UseShellExecute = true,
             });
         }

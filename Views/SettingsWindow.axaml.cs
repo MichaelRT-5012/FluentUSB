@@ -6,7 +6,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
-using Avalonia.Media.Transformation;
 using Avalonia.Threading;
 using FluentUSB.Controls;
 using FluentUSB.Models;
@@ -22,6 +21,7 @@ public partial class SettingsWindow : Window, IAppearanceHost
     private int _sectionIndex;
     private CancellationTokenSource? _sectionHideCts;
     private SettingsViewModel? _viewModel;
+    private UsbToastWindow? _previewToast;
     private readonly TranslateTransform _indicatorTransform = new();
     private readonly DispatcherTimer _indicatorTimer;
     private double _indicatorVelocity;
@@ -196,9 +196,19 @@ public partial class SettingsWindow : Window, IAppearanceHost
     /// <summary>用示例盘信息预览当前的插入弹窗外观（改完设置可直接看效果）。</summary>
     private void OnPreviewToastClick(object? sender, RoutedEventArgs e)
     {
+        // 连续点击预览时先收起上一个，避免多个预览窗完全重叠
+        _previewToast?.Dismiss();
+
         var toast = new UsbToastWindow(new UsbDriveInfo(
             "D:", @"D:\", "示例 U 盘", "exFAT",
-            15_902_400_000, 3_412_000_000));
+            15_902_400_000, 3_412_000_000), preview: true);
+        toast.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_previewToast, toast))
+                _previewToast = null;
+        };
+
+        _previewToast = toast;
         toast.Show();
     }
 }

@@ -2,7 +2,6 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="FluentUSB.App"
-             xmlns:local="using:FluentUSB"
              xmlns:controls="using:FluentUSB.Controls">
              <!-- 主题与窗口背景由设置页控制（%AppData%\FluentUSB\settings.json） -->
 
@@ -22,7 +21,7 @@
                 <ResourceDictionary x:Key="Light">
                     <!--
                         强调色：DodgerBlue，严格对齐 ClassIsland 的 CustomAccentColor="DodgerBlue"。
-                        覆盖 Avalonia FluentTheme 的 SystemAccentColor，令 ToggleSwitch/Slider/CheckBox
+                        覆盖 Avalonia FluentTheme 的 SystemAccentColor，令 Slider/CheckBox
                         单选、ComboBox 选中与强调按钮统一变为 ClassIsland 的蓝色。
                     -->
                     <Color x:Key="SystemAccentColor">#1E90FF</Color>
@@ -81,10 +80,6 @@
         </ResourceDictionary>
     </Application.Resources>
 
-    <Application.DataTemplates>
-        <local:ViewLocator/>
-    </Application.DataTemplates>
-
     <Application.Styles>
         <FluentTheme />
 
@@ -126,26 +121,6 @@
         <Style Selector="StackPanel.settings-container">
             <Setter Property="Margin" Value="12,12,18,12"/>
             <Setter Property="Spacing" Value="4"/>
-        </Style>
-
-        <!--
-            连体卡片组：对齐 ClassIsland 的 StackPanel.cardContainer（Spacing=1，首尾合并圆角）。
-            直接子元素用 Border.RowCard（4px 圆角、1px 描边），放进该容器后自动连成一组卡片。
-        -->
-        <Style Selector="StackPanel.cardContainer">
-            <Setter Property="Spacing" Value="1"/>
-        </Style>
-        <Style Selector="StackPanel.cardContainer > Border.RowCard:nth-child(1):nth-last-child(1)">
-            <Setter Property="CornerRadius" Value="4"/>
-        </Style>
-        <Style Selector="StackPanel.cardContainer > Border.RowCard:nth-child(1):not(:nth-last-child(1))">
-            <Setter Property="CornerRadius" Value="4,4,0,0"/>
-        </Style>
-        <Style Selector="StackPanel.cardContainer > Border.RowCard:nth-last-child(1):not(:nth-child(1))">
-            <Setter Property="CornerRadius" Value="0,0,4,4"/>
-        </Style>
-        <Style Selector="StackPanel.cardContainer > Border.RowCard:not(:nth-child(1)):not(:nth-last-child(1))">
-            <Setter Property="CornerRadius" Value="0"/>
         </Style>
 
         <!-- 分组标题：对齐 ClassIsland 的 IconText（16px 图标 + 14px 中等字重标题） -->
@@ -204,22 +179,10 @@
         <Style Selector="ComboBox /template/ Border#PopupBorder">
             <Setter Property="CornerRadius" Value="8"/>
         </Style>
-        <Style Selector="TextBox">
-            <Setter Property="MinHeight" Value="32"/>
-            <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="FontSize" Value="14"/>
-        </Style>
         <Style Selector="CheckBox, RadioButton">
             <Setter Property="MinHeight" Value="32"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-        </Style>
-        <!-- 与 ClassIsland 一致：开关直接显示「开 / 关」 -->
-        <Style Selector="ToggleSwitch">
-            <Setter Property="MinHeight" Value="32"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="OnContent" Value="开"/>
-            <Setter Property="OffContent" Value="关"/>
         </Style>
         <Style Selector="Slider">
             <Setter Property="MinHeight" Value="32"/>

@@ -77,7 +77,7 @@ public partial class SettingsViewModel : ObservableObject
 
         CapabilityText = capabilities.Description;
 
-        var build = Environment.OSVersion.Version.Build;
+        var build = capabilities.Build;
         SystemText = $"{(build >= 22000 ? "Windows 11" : "Windows 10")}（内部版本 {build}）";
         SettingsFilePath = SettingsStore.SettingsFilePath;
         LogFolderPath = Log.DirectoryPath;
@@ -146,7 +146,7 @@ public partial class SettingsViewModel : ObservableObject
     public string LogFolderPath { get; }
 
     public string AboutDescription { get; } =
-        "U 盘课件助手：插入 U 盘后自动弹出提示，快速定位最新课件并复制到对应学科文件夹。";
+        "常驻托盘的 U 盘助手：插入后自动弹出提示，可快速打开 U 盘并查看容量信息。";
 
     partial void OnSectionIndexChanged(int value)
     {
@@ -196,7 +196,7 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>整窗式 + 纯色时底色固定不透明，滑块禁用。</summary>
     public bool ToastOpacityEnabled =>
         !(ToastStyleIndex == (int)ToastStyle.Window
-          && SettingsStore.Current.ToastBackdrop == BackdropKind.Solid);
+          && BackdropService.Capabilities.Resolve(SettingsStore.Current.ToastBackdrop) == BackdropKind.Solid);
 
     partial void OnSurfaceOpacityPercentChanged(double value)
     {
@@ -276,6 +276,7 @@ public partial class SettingsViewModel : ObservableObject
         var defaults = new AppSettings
         {
             Backdrop = BackdropService.Capabilities.PreferredDefault,
+            ToastBackdrop = BackdropService.Capabilities.PreferredDefault,
         };
 
         SettingsStore.Reset(defaults);

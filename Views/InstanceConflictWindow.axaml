@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="460"
+        x:Class="FluentUSB.Views.InstanceConflictWindow"
+        Title="FluentUSB 已在运行"
+        Icon="/Assets/app.ico"
+        Width="460" SizeToContent="Height"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        TextOptions.TextRenderingMode="Antialias">
+
+    <Border x:Name="Surface"
+            Background="{DynamicResource WindowSurfaceBrush}"
+            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            Padding="24">
+        <Grid RowDefinitions="Auto,Auto,Auto">
+
+            <!-- 应用标识 + 说明 -->
+            <Grid ColumnDefinitions="Auto,*">
+                <Border Width="40" Height="40" CornerRadius="6"
+                        Background="{DynamicResource SystemControlBackgroundAccentBrush}"
+                        VerticalAlignment="Top">
+                    <TextBlock Text="&#xE88E;"
+                               FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                               FontSize="20" Foreground="#FFFFFFFF"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="4">
+                    <TextBlock Text="FluentUSB 已在运行" Classes="SubtitleText"/>
+                    <TextBlock Text="检测到已有实例在后台运行，本次启动已被拦截，不会同时运行两个实例。"
+                               Classes="Caption" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock Grid.Row="1" Margin="0,16,0,0" FontSize="12" TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                       Text="「重新启动」会先关闭当前实例，再由新进程接管；操作现有实例不会影响你的设置。"/>
+
+            <!-- 四个选项 -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8"
+                        HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Button Content="重新启动" Click="OnRestartClick"/>
+                <Button Content="显示主窗口" Classes="accent" Click="OnShowMainClick"/>
+                <Button Content="打开设置" Click="OnOpenSettingsClick"/>
+                <Button Content="取消" Click="OnCancelClick"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

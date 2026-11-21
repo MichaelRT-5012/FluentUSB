@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Avalonia;
@@ -28,6 +27,12 @@ public static class IntroAnimation
     private static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(750);
     private static readonly TimeSpan Stagger = TimeSpan.FromMilliseconds(25);
     private const double OffsetY = 50;
+
+    // 两个变换只解析一次，避免每次入场都走字符串解析
+    private static readonly TransformOperations HiddenTransform =
+        TransformOperations.Parse($"translateY({OffsetY}px)");
+    private static readonly TransformOperations ShownTransform =
+        TransformOperations.Parse("translateY(0px)");
 
     public static void SetEnabled(Panel panel, bool value) => panel.SetValue(EnabledProperty, value);
     public static bool GetEnabled(Panel panel) => panel.GetValue(EnabledProperty);
@@ -91,7 +96,7 @@ public static class IntroAnimation
             {
                 EnsureTransitions(c);
                 c.Opacity = 0;
-                c.RenderTransform = TransformOperations.Parse($"translateY({OffsetY}px)");
+                c.RenderTransform = HiddenTransform;
             }
 
             var index = 0;
@@ -107,7 +112,7 @@ public static class IntroAnimation
 
                 var c = targets[index++];
                 c.Opacity = 1;
-                c.RenderTransform = TransformOperations.Parse("translateY(0px)");
+                c.RenderTransform = ShownTransform;
             };
             Timers.AddOrUpdate(panel, timer);
             timer.Start();
@@ -143,7 +148,7 @@ public static class IntroAnimation
         foreach (var c in panel.Children.OfType<Control>())
         {
             c.Opacity = 1;
-            c.RenderTransform = TransformOperations.Parse("translateY(0px)");
+            c.RenderTransform = ShownTransform;
         }
     }
 }

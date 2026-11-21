@@ -10,6 +10,7 @@ using FluentUSB.ViewModels;
 using FluentUSB.Views;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
@@ -26,6 +27,7 @@ public partial class App : Application
     private readonly MainWindowViewModel _mainViewModel = new();
     private MainWindow? _mainWindow;
     private SettingsWindow? _settingsWindow;
+    private InstanceConflictWindow? _conflictWindow;
     private UsbDeviceMonitor? _usbMonitor;
 
     public override void Initialize()
@@ -42,6 +44,9 @@ public partial class App : Application
 
         RegisterExceptionHandlers();
 
+        // 第二个实例只会发来一个信号，由本实例弹出「已在运行」的提示窗口
+        InstanceBridge.StartListening(OnSecondInstanceDetected);
+
         SettingsStore.AppearanceChanged += OnAppearanceChanged;
         SettingsStore.SurfaceChanged += OnSurfaceChanged;
         SettingsStore.BehaviorChanged += OnBehaviorChanged;
@@ -55,9 +60,7 @@ public partial class App : Application
             HandleStartupArguments(desktop);
         }
 
-        // 已有 U 盘的枚举放到后台线程，启动时不阻塞界面
-        _mainViewModel.RefreshDrives();
-
+        // 主窗口显示时才会刷新列表，这里不再重复枚举一次驱动器
         StartUsbMonitor();
 
         Log.Info($"FluentUSB 已启动，背景={SettingsStore.Current.Backdrop}，系统={BackdropService.Capabilities.Description}");
@@ -126,6 +129,9 @@ public partial class App : Application
 
         if (_settingsWindow is not null)
             yield return _settingsWindow;
+
+        if (_conflictWindow is not null)
+            yield return _conflictWindow;
 
         foreach (var toast in _usbToasts)
             yield return toast;
@@ -220,6 +226,62 @@ public partial class App : Application
             _usbToasts[i].SetSlot(i);
     }
 
+    /// <summary>
+    /// 第二个实例启动时：弹出「已在运行」提示窗口。
+    /// 窗口已存在时只把它提到前面，避免重复叠窗。
+    /// </summary>
+    private void OnSecondInstanceDetected()
+    {
+        if (_conflictWindow is not null)
+        {
+            _conflictWindow.Activate();
+            return;
+        }
+
+        var window = new InstanceConflictWindow();
+        window.Closed += (_, _) => _conflictWindow = null;
+        _conflictWindow = window;
+        window.Show();
+        window.Activate();
+    }
+
+    /// <summary>关闭当前实例并拉起新进程（新进程会等本进程退出后再接管单实例互斥体）。</summary>
+    internal void RestartApplication()
+    {
+        var exe = Environment.ProcessPath;
+        if (exe is null)
+        {
+            Log.Error("重新启动失败：无法获取当前程序路径");
+            return;
+        }
+
+        // 先把尚未落盘的设置写完，新进程启动时会立即读取
+        SettingsStore.SaveNow();
+        _usbMonitor?.Dispose();
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(exe, $"--relaunch {Environment.ProcessId}")
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Error("重新启动失败", ex);
+            return;
+        }
+
+        Log.Info("用户选择重新启动程序");
+
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            if (_mainWindow is not null)
+                _mainWindow.AllowRealClose = true;
+            desktop.Shutdown();
+        }
+    }
+
     // 托盘左键：恢复主窗口
     private void OnTrayIconClicked(object? sender, EventArgs e) => ShowMainWindow();
 
@@ -245,7 +307,7 @@ public partial class App : Application
         }
     }
 
-    private void ShowMainWindow()
+    internal void ShowMainWindow()
     {
         _mainWindow ??= new MainWindow
         {
@@ -253,7 +315,8 @@ public partial class App : Application
         };
 
         _mainWindow.Show();
-        _mainWindow.WindowState = WindowState.Normal;
+        if (_mainWindow.WindowState == WindowState.Minimized)
+            _mainWindow.WindowState = WindowState.Normal;
         _mainWindow.Activate();
 
         // 打开窗口时校正一次列表，避免漏收事件或启动时盘尚未就绪

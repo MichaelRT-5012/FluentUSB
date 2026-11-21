@@ -130,7 +130,9 @@ internal static class SettingsStore
         settings.SurfaceOpacity = Math.Clamp(settings.SurfaceOpacity, 0.4, 1.0);
         settings.ToastOpacity = Math.Clamp(settings.ToastOpacity, 0.4, 1.0);
         settings.PopupMargin = Math.Clamp(settings.PopupMargin, 4, 64);
-        settings.PopupDurationSeconds = Math.Clamp(settings.PopupDurationSeconds, 2, 60);
+
+        // 与设置页滑块的取值范围保持一致（2 ~ 30 秒）
+        settings.PopupDurationSeconds = Math.Clamp(settings.PopupDurationSeconds, 2, 30);
 
         return settings;
     }

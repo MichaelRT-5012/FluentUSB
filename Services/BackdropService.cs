@@ -164,13 +164,17 @@ internal static class BackdropService
     public static void EnsureSupportedSettings()
     {
         var settings = SettingsStore.Current;
-        var resolved = Capabilities.Resolve(settings.Backdrop);
-        if (resolved != settings.Backdrop)
-        {
-            Log.Info($"配置的背景效果 {settings.Backdrop} 在当前系统不可用，改用 {resolved}");
-            settings.Backdrop = resolved;
-            SettingsStore.SaveNow();
-        }
+        var backdrop = Capabilities.Resolve(settings.Backdrop);
+        var toastBackdrop = Capabilities.Resolve(settings.ToastBackdrop);
+
+        if (backdrop == settings.Backdrop && toastBackdrop == settings.ToastBackdrop)
+            return;
+
+        // 弹窗背景也要一起纠正，否则设置页的「弹窗背景」列表会出现一项都没选中的状态
+        Log.Info($"配置的背景效果 {settings.Backdrop}/{settings.ToastBackdrop} 在当前系统不可用，改用 {backdrop}/{toastBackdrop}");
+        settings.Backdrop = backdrop;
+        settings.ToastBackdrop = toastBackdrop;
+        SettingsStore.SaveNow();
     }
 
     /// <summary>应用原生背景效果与底色；需在窗口已显示（有窗口句柄）后调用。</summary>

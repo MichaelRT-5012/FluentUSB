@@ -212,10 +212,11 @@ public sealed class UsbDeviceMonitor : IDisposable
             cts.Cancel();
 
         if (_activeDrives.Remove(letter))
-        {
             Log.Info($"U 盘已拔出 {letter}:");
-            DriveRemoved?.Invoke(letter + ":");
-        }
+
+        // 即使监听器没有记录该盘（例如启动枚举尚未完成），也通知移除，
+        // 让主窗口按盘符清理，避免残留已经拔出的盘
+        DriveRemoved?.Invoke(letter + ":");
     }
 
     /// <summary>

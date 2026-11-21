@@ -22,6 +22,7 @@ public partial class UsbToastWindow : Window, IAppearanceHost
 {
     private readonly DispatcherTimer _countdownTimer;
     private readonly TimeSpan _duration;
+    private readonly bool _preview;
     private TimeSpan _remaining;
     private bool _paused;
     private bool _dismissed;
@@ -32,12 +33,14 @@ public partial class UsbToastWindow : Window, IAppearanceHost
     {
     }
 
-    public UsbToastWindow(UsbDriveInfo drive)
+    /// <param name="preview">设置页的预览窗：只展示外观，点击时不打开示例盘符。</param>
+    public UsbToastWindow(UsbDriveInfo drive, bool preview = false)
     {
         InitializeComponent();
 
         DataContext = new UsbDriveViewModel(drive);
         DriveLetter = drive.DriveLetter;
+        _preview = preview;
 
         var settings = SettingsStore.Current;
         _duration = TimeSpan.FromSeconds(settings.PopupDurationSeconds);
@@ -180,11 +183,16 @@ public partial class UsbToastWindow : Window, IAppearanceHost
             Dismiss();
     }
 
-    // 点击弹窗任意位置 → 打开 U 盘（M1 临时用资源管理器，M2 替换为内建文件管理器）
+    // 左键点击弹窗 → 打开 U 盘；右键等其它按键不触发（避免误开）
     private void OnToastPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (DataContext is UsbDriveViewModel vm)
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            return;
+
+        // 预览窗只展示外观，不打开示例盘符，避免误开真实的同盘符磁盘
+        if (!_preview && DataContext is UsbDriveViewModel vm)
             vm.OpenDriveCommand.Execute(null);
+
         Dismiss();
     }
 
