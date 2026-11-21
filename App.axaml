@@ -12,8 +12,27 @@
     -->
     <Application.Resources>
         <ResourceDictionary>
+            <!--
+                内置 HarmonyOS Sans SC（与 ClassIsland 使用同一套字体族），
+                Regular/Medium 两个字重已打包进 Assets/Fonts，许可文本见同目录 LICENSE.txt。
+            -->
+            <FontFamily x:Key="AppFont">avares://FluentUSB/Assets/Fonts/#HarmonyOS Sans SC</FontFamily>
+
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Light">
+                    <!--
+                        强调色：DodgerBlue，严格对齐 ClassIsland 的 CustomAccentColor="DodgerBlue"。
+                        覆盖 Avalonia FluentTheme 的 SystemAccentColor，令 ToggleSwitch/Slider/CheckBox
+                        单选、ComboBox 选中与强调按钮统一变为 ClassIsland 的蓝色。
+                    -->
+                    <Color x:Key="SystemAccentColor">#1E90FF</Color>
+                    <Color x:Key="SystemAccentColorDark1">#1A82E6</Color>
+                    <Color x:Key="SystemAccentColorDark2">#1671CC</Color>
+                    <Color x:Key="SystemAccentColorDark3">#1259A6</Color>
+                    <Color x:Key="SystemAccentColorLight1">#4CA6FF</Color>
+                    <Color x:Key="SystemAccentColorLight2">#7ABDFF</Color>
+                    <Color x:Key="SystemAccentColorLight3">#A8D4FF</Color>
+                    <SolidColorBrush x:Key="SystemControlBackgroundAccentBrush" Color="#1E90FF" />
                     <!-- 窗口底色（无系统材质时的纯色底） -->
                     <SolidColorBrush x:Key="WindowSurfaceBrush" Color="#F3F3F3" />
                     <!-- 侧边栏/导航背景层 -->
@@ -35,6 +54,15 @@
                     <SolidColorBrush x:Key="DividerStrokeColorDefaultBrush" Color="#0F000000" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
+                    <!-- 强调色：DodgerBlue（暗色下保持一致，与 ClassIsland 相同） -->
+                    <Color x:Key="SystemAccentColor">#1E90FF</Color>
+                    <Color x:Key="SystemAccentColorDark1">#1A82E6</Color>
+                    <Color x:Key="SystemAccentColorDark2">#1671CC</Color>
+                    <Color x:Key="SystemAccentColorDark3">#1259A6</Color>
+                    <Color x:Key="SystemAccentColorLight1">#4CA6FF</Color>
+                    <Color x:Key="SystemAccentColorLight2">#7ABDFF</Color>
+                    <Color x:Key="SystemAccentColorLight3">#A8D4FF</Color>
+                    <SolidColorBrush x:Key="SystemControlBackgroundAccentBrush" Color="#1E90FF" />
                     <SolidColorBrush x:Key="WindowSurfaceBrush" Color="#202020" />
                     <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#4C3A3A3A" />
                     <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#0DFFFFFF" />
@@ -60,13 +88,87 @@
     <Application.Styles>
         <FluentTheme />
 
-        <!-- 全局统一：字体、圆角、字号与最小点击尺寸（触屏也能稳定点中） -->
+        <!--
+            全局版式令牌对齐 ClassIsland：HarmonyOS Sans SC + WinUI 字号层级，
+            标题 28 / 副标题 20 / 正文 14 / 说明 12。
+        -->
         <Style Selector="Window">
-            <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/>
+            <Setter Property="FontFamily" Value="{DynamicResource AppFont}"/>
         </Style>
+        <Style Selector="TextBlock.TitleText">
+            <Setter Property="FontSize" Value="28"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+        </Style>
+        <Style Selector="TextBlock.SubtitleText">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="TextBlock.BodyStrong">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="TextBlock.Caption">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <!-- 分组之间的细分隔线（对应 ClassIsland 设置页的 Separator Margin="0 12 0 4"） -->
+        <Style Selector="Border.SectionDivider">
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource DividerStrokeColorDefaultBrush}"/>
+            <Setter Property="Margin" Value="0,12,0,4"/>
+        </Style>
+
+        <!--
+            设置页版式容器：对齐 ClassIsland 的 StackPanel.settings-container
+            （Margin "12 12 18 12" + Spacing 4 + MaxWidth 960）。
+        -->
+        <Style Selector="StackPanel.settings-container">
+            <Setter Property="Margin" Value="12,12,18,12"/>
+            <Setter Property="Spacing" Value="4"/>
+        </Style>
+
+        <!--
+            连体卡片组：对齐 ClassIsland 的 StackPanel.cardContainer（Spacing=1，首尾合并圆角）。
+            直接子元素用 Border.RowCard（4px 圆角、1px 描边），放进该容器后自动连成一组卡片。
+        -->
+        <Style Selector="StackPanel.cardContainer">
+            <Setter Property="Spacing" Value="1"/>
+        </Style>
+        <Style Selector="StackPanel.cardContainer > Border.RowCard:nth-child(1):nth-last-child(1)">
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+        <Style Selector="StackPanel.cardContainer > Border.RowCard:nth-child(1):not(:nth-last-child(1))">
+            <Setter Property="CornerRadius" Value="4,4,0,0"/>
+        </Style>
+        <Style Selector="StackPanel.cardContainer > Border.RowCard:nth-last-child(1):not(:nth-child(1))">
+            <Setter Property="CornerRadius" Value="0,0,4,4"/>
+        </Style>
+        <Style Selector="StackPanel.cardContainer > Border.RowCard:not(:nth-child(1)):not(:nth-last-child(1))">
+            <Setter Property="CornerRadius" Value="0"/>
+        </Style>
+
+        <!-- 分组标题：对齐 ClassIsland 的 IconText（16px 图标 + 14px 中等字重标题） -->
+        <Style Selector="TextBlock.GroupIcon">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlBackgroundAccentBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.GroupHeader">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- 通用控件：圆角、字号与最小点击尺寸（触屏也能稳定点中） -->
         <Style Selector="Button">
             <Setter Property="CornerRadius" Value="4"/>
             <Setter Property="FontSize" Value="14"/>
+            <Setter Property="MinHeight" Value="32"/>
+            <!-- Avalonia 12 的 Button 默认内容左对齐，这里统一改为居中 -->
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
         <!-- 统一的交互反馈：悬停/按下的底色按 WinUI 的 167ms 平滑过渡 -->
         <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
@@ -112,9 +214,15 @@
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
+        <!-- 与 ClassIsland 一致：开关直接显示「开 / 关」 -->
         <Style Selector="ToggleSwitch">
             <Setter Property="MinHeight" Value="32"/>
             <Setter Property="FontSize" Value="14"/>
+            <Setter Property="OnContent" Value="开"/>
+            <Setter Property="OffContent" Value="关"/>
+        </Style>
+        <Style Selector="Slider">
+            <Setter Property="MinHeight" Value="32"/>
         </Style>
     </Application.Styles>
 

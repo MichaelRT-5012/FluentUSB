@@ -481,3 +481,8 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# 外观参考用的上游源码（仅本地查阅，不纳入版本库）
+ClassIsland-master/
+ClassIsland-2.1.0.1/
+

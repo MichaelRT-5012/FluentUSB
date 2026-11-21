@@ -15,7 +15,6 @@
         Topmost="True"
         ShowInTaskbar="False"
         ShowActivated="False"
-        FontFamily="Segoe UI Variable Text, Segoe UI"
         Background="Transparent"
         TransparencyLevelHint="Transparent"
         TextOptions.TextRenderingMode="Antialias"

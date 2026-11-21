@@ -5,15 +5,14 @@
         xmlns:controls="using:FluentUSB.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="600"
+        mc:Ignorable="d" d:DesignWidth="1040" d:DesignHeight="660"
         x:Class="FluentUSB.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Title="FluentUSB 设置"
         Icon="/Assets/app.ico"
-        Width="820" Height="600"
-        MinWidth="680" MinHeight="460"
+        Width="1040" Height="660"
+        MinWidth="820" MinHeight="520"
         WindowStartupLocation="CenterScreen"
-        FontFamily="Segoe UI Variable Text, Segoe UI"
         Background="Transparent"
         TransparencyLevelHint="Transparent"
         TextOptions.TextRenderingMode="Antialias">
@@ -23,28 +22,17 @@
     </Design.DataContext>
 
     <!--
-        版式参考 Windows 11 系统应用：左侧导航 + 右侧「分组标题 + 组内分隔行」，
-        行内左侧图标与标题/说明，右侧放开关、下拉或滑块。
+        严格对齐 ClassIsland 2.1.0.1 的设置窗口骨架：
+        · 48px 自绘标题栏（18px 应用图标 + 12px 标题，右侧版本号，系统最小化/最大化/关闭按钮）
+        · 左侧 NavigationView 风格导航（36px 项、20px 图标列、3px 强调色指示条）
+        · 页面标题 28px Normal，仅 12/18 内边距
+        · 设置容器 Spacing=4 的独立卡片；分组标题为 16px 图标 + 14px 文字
+        · 卡片为 SettingsExpander 规格：64 最小行高、16 内边距、20px 图标、14 标题 / 12 说明
+        · 入场动画：25ms 错峰、0.75s、cubic-bezier(0,1,0,1)、Y=50 上滑淡入
     -->
     <Window.Styles>
-        <Style Selector="TextBlock.PageTitle">
-            <Setter Property="FontSize" Value="32"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI"/>
-        </Style>
-        <Style Selector="TextBlock.GroupHeader">
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
-            <Setter Property="Margin" Value="2,18,0,8"/>
-        </Style>
         <Style Selector="TextBlock.RowLabel">
             <Setter Property="FontSize" Value="14"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-        </Style>
-        <Style Selector="TextBlock.Caption">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
         <Style Selector="TextBlock.CaptionTertiary">
@@ -58,21 +46,46 @@
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Width" Value="20"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
 
-        <!-- 行卡片：每行一个独立圆角卡片，行间留 4px 间距 -->
+        <!-- 设置卡片：对齐 FluentAvalonia 的 SettingsExpander（64/16/20/4px） -->
         <Style Selector="Border.RowCard">
             <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="16,12"/>
+            <Setter Property="MinHeight" Value="64"/>
         </Style>
 
-        <!-- 左侧导航项：40px 高，选中为淡填充 + 强调色细条 -->
+        <!-- 展开式卡片内的子选项行：整行可点；整行左移对齐上方标题列（16 卡片 + 20 图标 + 20 间距） -->
+        <Style Selector="RadioButton.OptionRow">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Margin" Value="56,0,16,0"/>
+            <Setter Property="Padding" Value="0,10"/>
+            <Setter Property="MinHeight" Value="52"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="00:00:00.167"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="RadioButton.OptionRow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="RadioButton.OptionRow:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+        </Style>
+
+        <!-- 左侧导航项：对齐 NavigationViewItem（36px、4px 圆角、20px 图标列） -->
         <Style Selector="Button.Nav">
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Padding" Value="0"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -85,39 +98,25 @@
                 </Transitions>
             </Setter>
         </Style>
-        <Style Selector="Button.Nav:pointerover">
+        <Style Selector="Button.Nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
         </Style>
-        <Style Selector="Button.Nav.selected">
+        <Style Selector="Button.Nav.selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
         </Style>
 
         <Style Selector="TextBlock.NavGroup">
             <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}"/>
-            <Setter Property="Margin" Value="12,10,0,4"/>
+            <Setter Property="Margin" Value="8,12,0,4"/>
         </Style>
-
-        <!-- 选项行：整行可点，悬停/选中为弱底色 -->
-        <Style Selector="RadioButton.BackdropRow">
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Padding" Value="12,6"/>
-            <Setter Property="MinHeight" Value="52"/>
-            <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="00:00:00.167"/>
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="RadioButton.BackdropRow:pointerover">
-            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
-        </Style>
-        <Style Selector="RadioButton.BackdropRow:checked">
-            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+        <Style Selector="TextBlock.NavIcon">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
     </Window.Styles>
 
@@ -125,144 +124,155 @@
             Background="{DynamicResource WindowSurfaceBrush}"
             BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
             BorderThickness="1">
-        <Grid ColumnDefinitions="200,*">
+        <Grid ColumnDefinitions="240,*">
 
-            <!-- 侧边栏 -->
+            <!-- NavigationView 侧窗 -->
             <Border Grid.Column="0"
                     Background="{DynamicResource LayerFillColorDefaultBrush}"
                     BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
                     BorderThickness="0,0,1,0">
-                <Grid RowDefinitions="Auto,*,Auto" Margin="10,16,10,14">
-                    <Grid ColumnDefinitions="Auto,*" Margin="6,0,0,6">
-                        <Border Width="32" Height="32" CornerRadius="4"
-                                Background="{DynamicResource SystemControlBackgroundAccentBrush}">
+                <Grid RowDefinitions="Auto,*,Auto" Margin="8,12,8,10">
+
+                    <!-- 应用标识：放在侧栏顶部，避免与系统标题栏文字重叠 -->
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10"
+                                Margin="12,0,0,10">
+                        <Border Width="18" Height="18" CornerRadius="3"
+                                Background="{DynamicResource SystemControlBackgroundAccentBrush}"
+                                VerticalAlignment="Center">
                             <TextBlock Text="&#xE88E;"
                                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                       FontSize="16" Foreground="#FFFFFFFF"
+                                       FontSize="10" Foreground="#FFFFFFFF"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <StackPanel Grid.Column="1" Margin="10,0,0,0"
-                                    VerticalAlignment="Center" Spacing="1">
-                            <TextBlock Text="FluentUSB" FontSize="14" FontWeight="SemiBold"/>
+                        <StackPanel Spacing="1" VerticalAlignment="Center">
+                            <TextBlock Text="FluentUSB" FontSize="13" FontWeight="SemiBold"/>
                             <TextBlock Text="设置" Classes="Caption"/>
                         </StackPanel>
-                    </Grid>
+                    </StackPanel>
 
-                    <Grid x:Name="NavLayer" Grid.Row="1" Margin="0,6,0,0">
-                        <StackPanel Spacing="2">
+                    <Grid x:Name="NavLayer" Grid.Row="1">
+                        <StackPanel Spacing="2" VerticalAlignment="Top">
                             <TextBlock Text="个性化" Classes="NavGroup"/>
                             <Button x:Name="NavAppearance" Classes="Nav"
                                     Classes.selected="{Binding IsAppearanceSection}"
                                     Command="{Binding ShowAppearanceCommand}">
-                                <Grid ColumnDefinitions="24,*">
-                                    <TextBlock Text="&#xE790;" Classes="RowIcon" FontSize="15"/>
+                                <Grid ColumnDefinitions="20,*" Margin="12,0,0,0">
+                                    <TextBlock Text="&#xE790;" Classes="NavIcon"/>
                                     <TextBlock Grid.Column="1" Text="外观" FontSize="14"
-                                               VerticalAlignment="Center"/>
+                                               Margin="12,0,0,0" VerticalAlignment="Center"/>
                                 </Grid>
                             </Button>
 
-                            <TextBlock Text="应用" Classes="NavGroup" Margin="12,14,0,4"/>
+                            <TextBlock Text="应用" Classes="NavGroup" Margin="8,14,0,4"/>
                             <Button x:Name="NavAbout" Classes="Nav"
                                     Classes.selected="{Binding IsAboutSection}"
                                     Command="{Binding ShowAboutCommand}">
-                                <Grid ColumnDefinitions="24,*">
-                                    <TextBlock Text="&#xE946;" Classes="RowIcon" FontSize="15"/>
+                                <Grid ColumnDefinitions="20,*" Margin="12,0,0,0">
+                                    <TextBlock Text="&#xE946;" Classes="NavIcon"/>
                                     <TextBlock Grid.Column="1" Text="关于" FontSize="14"
-                                               VerticalAlignment="Center"/>
+                                               Margin="12,0,0,0" VerticalAlignment="Center"/>
                                 </Grid>
                             </Button>
                         </StackPanel>
 
-                        <!-- 选中指示条：切换分类时以弹簧动画滑到目标项 -->
+                        <!-- 选中指示条：3×16 强调色，切换分类时弹簧滑行 -->
                         <Border x:Name="NavIndicator"
                                 Width="3" Height="16" CornerRadius="1.5"
                                 HorizontalAlignment="Left" VerticalAlignment="Top"
-                                Margin="4,0,0,0"
+                                Margin="0,0,0,0"
                                 Background="{DynamicResource SystemControlBackgroundAccentBrush}"
                                 IsHitTestVisible="False"/>
                     </Grid>
 
                     <TextBlock Grid.Row="2" Text="{Binding VersionText}"
-                               Classes="CaptionTertiary" Margin="6,0,0,0"/>
+                               Classes="CaptionTertiary" Margin="12,0,0,0"/>
                 </Grid>
             </Border>
 
-            <!-- 右侧内容 -->
-            <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto">
+                <!-- 页面区域 -->
+                <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto">
 
-                <StackPanel Grid.Row="0" Margin="32,24,32,0" Spacing="2">
-                    <TextBlock Text="{Binding SectionTitle}" Classes="PageTitle"/>
-                    <TextBlock Text="{Binding SectionDescription}" Classes="Caption"/>
-                </StackPanel>
+                    <!-- 页面标题：28px Normal，12/18 内边距（ClassIsland 的 TitleTextBlockStyle + TitleContainer） -->
+                    <StackPanel Grid.Row="0" Margin="12,16,18,0" Spacing="2">
+                        <TextBlock Text="{Binding SectionTitle}" Classes="TitleText"/>
+                        <TextBlock Text="{Binding SectionDescription}" Classes="Caption"
+                                   Margin="0,0,0,4"/>
+                    </StackPanel>
 
-                <ScrollViewer x:Name="ContentScroller" Grid.Row="1"
-                              VerticalScrollBarVisibility="Auto" Margin="32,8,22,10">
-                    <Panel>
+                    <ScrollViewer x:Name="ContentScroller" Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto" Margin="12,4,18,0">
+                        <Panel>
 
-                        <!-- 外观 -->
-                        <StackPanel x:Name="AppearanceSection" Margin="0,0,10,8" IsVisible="True">
-                            <StackPanel.Transitions>
-                                <Transitions>
-                                    <DoubleTransition Property="Opacity" Duration="00:00:00.2" Easing="CubicEaseOut"/>
-                                    <TransformOperationsTransition Property="RenderTransform" Duration="00:00:00.3" Easing="CubicEaseOut"/>
-                                </Transitions>
-                            </StackPanel.Transitions>
+                            <!-- 外观 -->
+                            <StackPanel x:Name="AppearanceSection" Classes="settings-container"
+                                        Margin="0,0,10,12" IsVisible="True"
+                                        controls:IntroAnimation.Enabled="True">
 
-                            <!-- 系统能力提示 -->
-                            <Border CornerRadius="4" Padding="12,10"
-                                    Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
-                                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                                    BorderThickness="1">
-                                <Grid ColumnDefinitions="Auto,*">
-                                    <TextBlock Text="&#xE946;" Classes="RowIcon" FontSize="14"/>
-                                    <TextBlock Grid.Column="1" Margin="10,0,0,0"
-                                               Text="{Binding CapabilityText}" Classes="Caption"
-                                               VerticalAlignment="Center"/>
-                                </Grid>
-                            </Border>
+                                <!-- 系统能力说明（InfoBar 观感） -->
+                                <Border CornerRadius="4" Padding="12,10" Margin="0,0,0,8"
+                                        Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
+                                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <TextBlock Text="&#xE946;" Classes="RowIcon" FontSize="14"/>
+                                        <TextBlock Grid.Column="1" Margin="12,0,0,0"
+                                                   Text="{Binding CapabilityText}" Classes="Caption"
+                                                   VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
 
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="2,18,0,8">
-                                <TextBlock Text="&#xE790;" Classes="RowIcon" FontSize="14"/>
-                                <TextBlock Text="窗口与背景" Classes="GroupHeader" Margin="0"/>
-                            </StackPanel>
-                            <StackPanel Spacing="4">
-                                <Border Classes="RowCard">
-                                    <StackPanel Spacing="1">
-                                        <TextBlock Text="背景效果" Classes="RowLabel"/>
-                                        <TextBlock Text="只影响主窗口与本设置页" Classes="Caption"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+                                    <TextBlock Text="&#xE790;" Classes="GroupIcon"/>
+                                    <TextBlock Text="窗口与背景" Classes="GroupHeader"/>
+                                </StackPanel>
+
+                                <!-- 展开式卡片（SettingsExpander 展开态）：标题 + 连体子选项 -->
+                                <Border Classes="RowCard" Padding="0" ClipToBounds="True">
+                                    <StackPanel>
+                                        <Grid ColumnDefinitions="Auto,*" Margin="16,12">
+                                            <TextBlock Text="&#xE790;" Classes="RowIcon"/>
+                                            <StackPanel Grid.Column="1" Margin="20,0,16,0" Spacing="1"
+                                                        VerticalAlignment="Center">
+                                                <TextBlock Text="背景效果" Classes="RowLabel"/>
+                                                <TextBlock Text="只影响主窗口与本设置页" Classes="Caption"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <Border Height="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}"/>
+                                        <ItemsControl ItemsSource="{Binding BackdropOptions}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:BackdropOptionViewModel">
+                                                    <Border BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                                                            BorderThickness="0,0,0,1">
+                                                        <RadioButton GroupName="Backdrop"
+                                                                     Classes="OptionRow"
+                                                                     IsEnabled="{Binding IsSupported}"
+                                                                     IsChecked="{Binding IsSelected, Mode=TwoWay}">
+                                                            <StackPanel Spacing="1">
+                                                                <TextBlock Text="{Binding Title}" FontSize="14"/>
+                                                                <TextBlock Text="{Binding Description}" Classes="Caption"/>
+                                                                <TextBlock Text="{Binding Note}"
+                                                                           Classes="CaptionTertiary"
+                                                                           IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                                            </StackPanel>
+                                                        </RadioButton>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
                                     </StackPanel>
                                 </Border>
-                                <ItemsControl ItemsSource="{Binding BackdropOptions}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:BackdropOptionViewModel">
-                                            <Border Classes="RowCard" Padding="8,2" Margin="0,0,0,4">
-                                                <RadioButton GroupName="Backdrop"
-                                                             Classes="BackdropRow"
-                                                             IsEnabled="{Binding IsSupported}"
-                                                             IsChecked="{Binding IsSelected, Mode=TwoWay}">
-                                                    <StackPanel Spacing="1">
-                                                        <TextBlock Text="{Binding Title}" FontSize="14"/>
-                                                        <TextBlock Text="{Binding Description}" Classes="Caption"/>
-                                                        <TextBlock Text="{Binding Note}"
-                                                                   Classes="CaptionTertiary"
-                                                                   IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                                    </StackPanel>
-                                                </RadioButton>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
 
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="2,18,0,8">
-                                <TextBlock Text="&#xE713;" Classes="RowIcon" FontSize="14"/>
-                                <TextBlock Text="显示" Classes="GroupHeader" Margin="0"/>
-                            </StackPanel>
-                            <StackPanel Spacing="4">
-                                <Border Classes="RowCard" Padding="14,12">
+                                <Border Classes="SectionDivider"/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+                                    <TextBlock Text="&#xE713;" Classes="GroupIcon"/>
+                                    <TextBlock Text="显示" Classes="GroupHeader"/>
+                                </StackPanel>
+
+                                <Border Classes="RowCard">
                                     <Grid ColumnDefinitions="Auto,*,Auto">
                                         <TextBlock Text="&#xE706;" Classes="RowIcon"/>
-                                        <StackPanel Grid.Column="1" Margin="14,0,16,0" Spacing="1"
+                                        <StackPanel Grid.Column="1" Margin="20,0,16,0" Spacing="1"
                                                     VerticalAlignment="Center">
                                             <TextBlock Text="背景不透明度" Classes="RowLabel"/>
                                             <TextBlock Text="越低越通透，100% 时接近纯色"
@@ -277,15 +287,16 @@
                                     </Grid>
                                 </Border>
 
-                                <Border Classes="RowCard">
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <StackPanel Margin="0,0,16,0" Spacing="1"
+                                <Border Classes="RowCard" Margin="0,4,0,0">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <TextBlock Text="&#xE771;" Classes="RowIcon"/>
+                                        <StackPanel Grid.Column="1" Margin="20,0,16,0" Spacing="1"
                                                     VerticalAlignment="Center">
                                             <TextBlock Text="主题" Classes="RowLabel"/>
                                             <TextBlock Text="跟随系统会随 Windows 深浅色自动切换"
                                                        Classes="Caption"/>
                                         </StackPanel>
-                                        <ComboBox Grid.Column="1" Width="160"
+                                        <ComboBox Grid.Column="2" Width="160"
                                                   SelectedIndex="{Binding ThemeIndex, Mode=TwoWay}">
                                             <ComboBoxItem Content="跟随系统"/>
                                             <ComboBoxItem Content="深色"/>
@@ -293,130 +304,135 @@
                                         </ComboBox>
                                     </Grid>
                                 </Border>
-                            </StackPanel>
 
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="2,18,0,8">
-                                <TextBlock Text="&#xE88E;" Classes="RowIcon" FontSize="14"/>
-                                <TextBlock Text="插入弹窗" Classes="GroupHeader" Margin="0"/>
-                            </StackPanel>
-                            <StackPanel Spacing="4">
+                                <Border Classes="SectionDivider"/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+                                    <TextBlock Text="&#xE88E;" Classes="GroupIcon"/>
+                                    <TextBlock Text="插入弹窗" Classes="GroupHeader"/>
+                                </StackPanel>
+
                                 <Border Classes="RowCard">
                                     <Grid ColumnDefinitions="Auto,*,Auto">
-                                            <TextBlock Text="&#xE790;" Classes="RowIcon"/>
-                                            <StackPanel Grid.Column="1" Margin="14,0,16,0" Spacing="1"
-                                                        VerticalAlignment="Center">
-                                                <TextBlock Text="绘制方式" Classes="RowLabel"/>
-                                                <TextBlock Text="卡片式：圆角卡片 + 柔和阴影；整窗式：系统材质 + 系统圆角"
-                                                           Classes="Caption"/>
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
-                                                        VerticalAlignment="Center">
-                                                <ComboBox Width="130"
-                                                          SelectedIndex="{Binding ToastStyleIndex, Mode=TwoWay}">
-                                                    <ComboBoxItem Content="卡片式"/>
-                                                    <ComboBoxItem Content="整窗式"/>
-                                                </ComboBox>
-                                                <Button Content="预览" Padding="12,3" FontSize="12"
-                                                        Click="OnPreviewToastClick"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-
-                                <Border Classes="RowCard" IsVisible="{Binding ToastBackdropVisible}">
-                                    <StackPanel Spacing="8">
-                                        <StackPanel Spacing="1">
-                                            <TextBlock Text="弹窗背景" Classes="RowLabel"/>
-                                            <TextBlock Text="仅整窗式生效；卡片式始终是半透明圆角卡片"
+                                        <TextBlock Text="&#xE7C4;" Classes="RowIcon"/>
+                                        <StackPanel Grid.Column="1" Margin="20,0,16,0" Spacing="1"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock Text="绘制方式" Classes="RowLabel"/>
+                                            <TextBlock Text="卡片式：圆角卡片 + 柔和阴影；整窗式：系统材质 + 系统圆角"
                                                        Classes="Caption"/>
                                         </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
+                                                    VerticalAlignment="Center">
+                                            <ComboBox Width="130"
+                                                      SelectedIndex="{Binding ToastStyleIndex, Mode=TwoWay}">
+                                                <ComboBoxItem Content="卡片式"/>
+                                                <ComboBoxItem Content="整窗式"/>
+                                            </ComboBox>
+                                            <Button Content="预览" Padding="12,4" FontSize="13"
+                                                    MinHeight="32" Click="OnPreviewToastClick"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <Border Classes="RowCard" Margin="0,4,0,0"
+                                        IsVisible="{Binding ToastBackdropVisible}" Padding="0" ClipToBounds="True">
+                                    <StackPanel>
+                                        <Grid ColumnDefinitions="Auto,*" Margin="16,12">
+                                            <TextBlock Text="&#xE790;" Classes="RowIcon"/>
+                                            <StackPanel Grid.Column="1" Margin="20,0,16,0" Spacing="1">
+                                                <TextBlock Text="弹窗背景" Classes="RowLabel"/>
+                                                <TextBlock Text="仅整窗式生效；卡片式始终是半透明圆角卡片"
+                                                           Classes="Caption"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <Border Height="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}"/>
                                         <ItemsControl ItemsSource="{Binding ToastBackdropOptions}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate x:DataType="vm:BackdropOptionViewModel">
-                                                    <RadioButton GroupName="ToastBackdrop"
-                                                                 Classes="BackdropRow"
-                                                                 IsEnabled="{Binding IsSupported}"
-                                                                 IsChecked="{Binding IsSelected, Mode=TwoWay}">
-                                                        <StackPanel Spacing="1">
-                                                            <TextBlock Text="{Binding Title}" FontSize="14"/>
-                                                            <TextBlock Text="{Binding Description}" Classes="Caption"/>
-                                                            <TextBlock Text="{Binding Note}"
-                                                                       Classes="CaptionTertiary"
-                                                                       IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                                        </StackPanel>
-                                                    </RadioButton>
+                                                    <Border BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                                                            BorderThickness="0,0,0,1">
+                                                        <RadioButton GroupName="ToastBackdrop"
+                                                                     Classes="OptionRow"
+                                                                     IsEnabled="{Binding IsSupported}"
+                                                                     IsChecked="{Binding IsSelected, Mode=TwoWay}">
+                                                            <StackPanel Spacing="1">
+                                                                <TextBlock Text="{Binding Title}" FontSize="14"/>
+                                                                <TextBlock Text="{Binding Description}" Classes="Caption"/>
+                                                                <TextBlock Text="{Binding Note}"
+                                                                           Classes="CaptionTertiary"
+                                                                           IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                                            </StackPanel>
+                                                        </RadioButton>
+                                                    </Border>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
                                     </StackPanel>
                                 </Border>
 
-                                    <Border Classes="RowCard" Padding="14,12">
-                                        <Grid ColumnDefinitions="Auto,*,Auto">
-                                            <TextBlock Text="&#xE706;" Classes="RowIcon"/>
-                                            <StackPanel Grid.Column="1" Margin="14,0,16,0" Spacing="1"
-                                                        VerticalAlignment="Center">
-                                                <TextBlock Text="弹窗不透明度" Classes="RowLabel"/>
-                                                <TextBlock Text="只影响插入弹窗的底色"
-                                                           Classes="Caption"/>
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="2" Width="200" VerticalAlignment="Center">
-                                                <controls:ValueSlider Minimum="40" Maximum="100"
-                                                                     Format="{}{0:0}%"
-                                                                     IsEnabled="{Binding ToastOpacityEnabled}"
-                                                                     Value="{Binding ToastOpacityPercent, Mode=TwoWay}"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
+                                <Border Classes="RowCard" Margin="0,4,0,0">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <TextBlock Text="&#xE706;" Classes="RowIcon"/>
+                                        <StackPanel Grid.Column="1" Margin="20,0,16,0" Spacing="1"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock Text="弹窗不透明度" Classes="RowLabel"/>
+                                            <TextBlock Text="只影响插入弹窗的底色"
+                                                       Classes="Caption"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Width="200" VerticalAlignment="Center">
+                                            <controls:ValueSlider Minimum="40" Maximum="100"
+                                                                 Format="{}{0:0}%"
+                                                                 IsEnabled="{Binding ToastOpacityEnabled}"
+                                                                 Value="{Binding ToastOpacityPercent, Mode=TwoWay}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
 
-                                    <Border Classes="RowCard">
-                                        <Grid ColumnDefinitions="Auto,*,Auto">
-                                            <TextBlock Text="&#xE707;" Classes="RowIcon"/>
-                                            <StackPanel Grid.Column="1" Margin="14,0,16,0" Spacing="1"
-                                                        VerticalAlignment="Center">
-                                                <TextBlock Text="停靠位置" Classes="RowLabel"/>
-                                                <TextBlock Text="跟随鼠标所在屏幕显示" Classes="Caption"/>
-                                            </StackPanel>
-                                            <ComboBox Grid.Column="2" Width="160"
-                                                      SelectedIndex="{Binding PopupPositionIndex, Mode=TwoWay}">
-                                                <ComboBoxItem Content="左下角"/>
-                                                <ComboBoxItem Content="右下角"/>
-                                                <ComboBoxItem Content="左上角"/>
-                                                <ComboBoxItem Content="右上角"/>
-                                            </ComboBox>
-                                        </Grid>
-                                    </Border>
+                                <Border Classes="RowCard" Margin="0,4,0,0">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <TextBlock Text="&#xE707;" Classes="RowIcon"/>
+                                        <StackPanel Grid.Column="1" Margin="20,0,16,0" Spacing="1"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock Text="停靠位置" Classes="RowLabel"/>
+                                            <TextBlock Text="跟随鼠标所在屏幕显示" Classes="Caption"/>
+                                        </StackPanel>
+                                        <ComboBox Grid.Column="2" Width="160"
+                                                  SelectedIndex="{Binding PopupPositionIndex, Mode=TwoWay}">
+                                            <ComboBoxItem Content="左下角"/>
+                                            <ComboBoxItem Content="右下角"/>
+                                            <ComboBoxItem Content="左上角"/>
+                                            <ComboBoxItem Content="右上角"/>
+                                        </ComboBox>
+                                    </Grid>
+                                </Border>
 
-                                    <Border Classes="RowCard" Padding="14,12">
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <StackPanel Margin="0,0,16,0" Spacing="1"
-                                                        VerticalAlignment="Center">
-                                                <TextBlock Text="停留时长" Classes="RowLabel"/>
-                                                <TextBlock Text="悬停时暂停倒计时" Classes="Caption"/>
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="1" Width="200" VerticalAlignment="Center">
-                                                <controls:ValueSlider Minimum="2" Maximum="30"
-                                                                     Format="{}{0:0} 秒"
-                                                                     Value="{Binding PopupDurationSeconds, Mode=TwoWay}"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-                                </StackPanel>
-                        </StackPanel>
-
-                        <!-- 关于 -->
-                        <StackPanel x:Name="AboutSection" Margin="0,0,10,8" IsVisible="False">
-                            <StackPanel.Transitions>
-                                <Transitions>
-                                    <DoubleTransition Property="Opacity" Duration="00:00:00.2" Easing="CubicEaseOut"/>
-                                    <TransformOperationsTransition Property="RenderTransform" Duration="00:00:00.3" Easing="CubicEaseOut"/>
-                                </Transitions>
-                            </StackPanel.Transitions>
-
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="2,0,0,8">
-                                <TextBlock Text="&#xE946;" Classes="RowIcon" FontSize="14"/>
-                                <TextBlock Text="应用信息" Classes="GroupHeader" Margin="0"/>
+                                <Border Classes="RowCard" Margin="0,4,0,0">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <TextBlock Text="&#xE823;" Classes="RowIcon"/>
+                                        <StackPanel Grid.Column="1" Margin="20,0,16,0" Spacing="1"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock Text="停留时长" Classes="RowLabel"/>
+                                            <TextBlock Text="悬停时暂停倒计时" Classes="Caption"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Width="200" VerticalAlignment="Center">
+                                            <controls:ValueSlider Minimum="2" Maximum="30"
+                                                                 Format="{}{0:0} 秒"
+                                                                 Value="{Binding PopupDurationSeconds, Mode=TwoWay}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </StackPanel>
-                            <StackPanel Spacing="4">
+
+                            <!-- 关于 -->
+                            <StackPanel x:Name="AboutSection" Classes="settings-container"
+                                        Margin="0,0,10,12" IsVisible="False"
+                                        controls:IntroAnimation.Enabled="True">
+
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+                                    <TextBlock Text="&#xE946;" Classes="GroupIcon"/>
+                                    <TextBlock Text="应用信息" Classes="GroupHeader"/>
+                                </StackPanel>
+
                                 <Border Classes="RowCard" Padding="16">
                                     <Grid ColumnDefinitions="Auto,*">
                                         <Border Width="44" Height="44" CornerRadius="4"
@@ -434,63 +450,95 @@
                                     </Grid>
                                 </Border>
 
-                                <Border Classes="RowCard">
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <TextBlock Text="运行系统"
+                                <Border Classes="RowCard" Margin="0,4,0,0">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <TextBlock Text="&#xE7F8;" Classes="RowIcon"/>
+                                        <TextBlock Grid.Column="1" Margin="20,0,16,0" Text="运行系统"
                                                    Classes="RowLabel" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding SystemText}"
+                                        <TextBlock Grid.Column="2" Text="{Binding SystemText}"
                                                    Classes="Caption" VerticalAlignment="Center"/>
                                     </Grid>
                                 </Border>
-                                <Border Classes="RowCard">
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <TextBlock Text="构建时间"
+                                <Border Classes="RowCard" Margin="0,4,0,0">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <TextBlock Text="&#xE823;" Classes="RowIcon"/>
+                                        <TextBlock Grid.Column="1" Margin="20,0,16,0" Text="构建时间"
                                                    Classes="RowLabel" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding BuildText}"
+                                        <TextBlock Grid.Column="2" Text="{Binding BuildText}"
                                                    Classes="Caption" VerticalAlignment="Center"/>
                                     </Grid>
                                 </Border>
-                            </StackPanel>
 
-                            <TextBlock Text="文件位置" Classes="GroupHeader" Margin="2,18,0,8"/>
-                            <StackPanel Spacing="4">
+                                <Border Classes="SectionDivider"/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+                                    <TextBlock Text="&#xE8A5;" Classes="GroupIcon"/>
+                                    <TextBlock Text="文件位置" Classes="GroupHeader"/>
+                                </StackPanel>
+
                                 <Border Classes="RowCard">
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="设置文件" Classes="RowLabel"/>
-                                        <SelectableTextBlock Text="{Binding SettingsFilePath}"
-                                                             Classes="Caption"/>
-                                    </StackPanel>
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <TextBlock Text="&#xE8A5;" Classes="RowIcon"/>
+                                        <StackPanel Grid.Column="1" Margin="20,0,0,0" Spacing="2">
+                                            <TextBlock Text="设置文件" Classes="RowLabel"/>
+                                            <SelectableTextBlock Text="{Binding SettingsFilePath}"
+                                                                 Classes="Caption"/>
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
-                                <Border Classes="RowCard">
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="日志目录" Classes="RowLabel"/>
-                                        <SelectableTextBlock Text="{Binding LogFolderPath}"
-                                                             Classes="Caption"/>
-                                    </StackPanel>
+                                <Border Classes="RowCard" Margin="0,4,0,0">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <TextBlock Text="&#xE8B7;" Classes="RowIcon"/>
+                                        <StackPanel Grid.Column="1" Margin="20,0,0,0" Spacing="2">
+                                            <TextBlock Text="日志目录" Classes="RowLabel"/>
+                                            <SelectableTextBlock Text="{Binding LogFolderPath}"
+                                                                 Classes="Caption"/>
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
+
+                                <Border Classes="SectionDivider"/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+                                    <TextBlock Text="&#xE8F1;" Classes="GroupIcon"/>
+                                    <TextBlock Text="开源与致谢" Classes="GroupHeader"/>
+                                </StackPanel>
+
                                 <Border Classes="RowCard">
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="下一步" Classes="RowLabel"/>
-                                        <TextBlock Classes="Caption"
-                                                   Text="列出 U 盘根目录的最新课件，支持多选后按科目一键复制并打开目标文件夹。"/>
-                                    </StackPanel>
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <TextBlock Text="&#xE8D2;" Classes="RowIcon"/>
+                                        <StackPanel Grid.Column="1" Margin="20,0,0,0" Spacing="2">
+                                            <TextBlock Text="HarmonyOS Sans SC" Classes="RowLabel"/>
+                                            <TextBlock Classes="Caption"
+                                                       Text="界面字体由华为提供，© Huawei Device Co., Ltd.，按 HarmonyOS Sans Fonts License Agreement 随应用分发。"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <Border Classes="RowCard" Margin="0,4,0,0">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <TextBlock Text="&#xE943;" Classes="RowIcon"/>
+                                        <StackPanel Grid.Column="1" Margin="20,0,0,0" Spacing="2">
+                                            <TextBlock Text="Avalonia UI" Classes="RowLabel"/>
+                                            <TextBlock Classes="Caption"
+                                                       Text="跨平台界面框架，本应用的窗口、控件与动画均构建在其之上。"/>
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
                             </StackPanel>
-                        </StackPanel>
-                    </Panel>
-                </ScrollViewer>
+                        </Panel>
+                    </ScrollViewer>
 
-                <!-- 底部操作 -->
-                <Border Grid.Row="2" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
-                        BorderThickness="0,1,0,0">
-                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="32,12,24,16">
-                        <Button Content="恢复默认" Command="{Binding ResetDefaultsCommand}"
-                                IsVisible="{Binding IsAppearanceSection}"/>
-                        <Button Grid.Column="2" Content="关闭" Click="OnCloseClick"
-                                MinWidth="88" Classes="accent"/>
-                    </Grid>
-                </Border>
+                    <!-- 底部操作 -->
+                    <Border Grid.Row="2" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0">
+                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="12,10,18,12">
+                            <Button Content="恢复默认" Command="{Binding ResetDefaultsCommand}"
+                                    IsVisible="{Binding IsAppearanceSection}"/>
+                            <Button Grid.Column="2" Content="关闭" Click="OnCloseClick"
+                                    MinWidth="88" Classes="accent"/>
+                        </Grid>
+                    </Border>
+                </Grid>
             </Grid>
-        </Grid>
     </Border>
 </Window>

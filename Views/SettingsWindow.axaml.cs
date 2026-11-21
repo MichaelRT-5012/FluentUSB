@@ -8,6 +8,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Transformation;
 using Avalonia.Threading;
+using FluentUSB.Controls;
 using FluentUSB.Models;
 using FluentUSB.Services;
 using FluentUSB.ViewModels;
@@ -40,7 +41,6 @@ public partial class SettingsWindow : Window, IAppearanceHost
             // 小屏幕下窗口不能超出工作区，否则底部按钮会被裁掉
             Dispatcher.UIThread.Post(FitToScreen, DispatcherPriority.Loaded);
             BackdropService.Apply(this);
-            AnimateSection(AppearanceSection, 10);
             Dispatcher.UIThread.Post(() => MoveIndicatorToCurrent(immediate: true),
                 DispatcherPriority.Loaded);
         };
@@ -85,30 +85,23 @@ public partial class SettingsWindow : Window, IAppearanceHost
 
         var outgoing = from == 1 ? AboutSection : AppearanceSection;
         var incoming = to == 1 ? AboutSection : AppearanceSection;
-        var direction = to > from ? 1 : -1;
-        const double offset = 12;
 
         ContentScroller.Offset = default;
 
+        // 旧内容快速淡出
         outgoing.Opacity = 0;
-        outgoing.RenderTransform = TransformOperations.Parse($"translateY({-direction * offset:0}px)");
 
         incoming.IsVisible = true;
-        incoming.Opacity = 0;
-        incoming.RenderTransform = TransformOperations.Parse($"translateY({direction * offset:0}px)");
+        incoming.Opacity = 1;
 
-        // 等一帧让起始状态生效，再过渡到终态
-        Dispatcher.UIThread.Post(() =>
-        {
-            incoming.Opacity = 1;
-            incoming.RenderTransform = TransformOperations.Parse("translateY(0px)");
-        }, DispatcherPriority.Background);
+        // 新内容按 ClassIsland 的 animated-intro 重新错峰上滑
+        Dispatcher.UIThread.Post(() => IntroAnimation.Restart(incoming), DispatcherPriority.Background);
 
         // 淡出结束后隐藏旧内容；被快速切回时取消，避免误隐藏
         _sectionHideCts?.Cancel();
         var cts = new CancellationTokenSource();
         _sectionHideCts = cts;
-        _ = Task.Delay(240, cts.Token).ContinueWith(task =>
+        _ = Task.Delay(160, cts.Token).ContinueWith(task =>
         {
             if (task.IsCanceled)
                 return;
@@ -162,19 +155,6 @@ public partial class SettingsWindow : Window, IAppearanceHost
             _indicatorVelocity = 0;
             _indicatorTimer.Stop();
         }
-    }
-
-    private static void AnimateSection(Control section, double offset = 14)
-    {
-        section.Opacity = 0;
-        section.RenderTransform = TransformOperations.Parse($"translateY({offset:0}px)");
-
-        // 等一帧，让初始状态生效后再过渡到终态
-        Dispatcher.UIThread.Post(() =>
-        {
-            section.Opacity = 1;
-            section.RenderTransform = TransformOperations.Parse("translateY(0px)");
-        }, DispatcherPriority.Background);
     }
 
     /// <summary>把窗口尺寸限制在当前屏幕工作区内并重新居中（只在首次打开时执行）。</summary>

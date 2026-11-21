@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
@@ -16,6 +16,20 @@
   <ItemGroup>
     <Folder Include="Models\" />
     <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <!-- 参考用的 ClassIsland 源码放在仓库内，不能被当作本项目的编译/XAML 资源 -->
+  <ItemGroup>
+    <Compile Remove="ClassIsland-master\**" />
+    <AvaloniaXaml Remove="ClassIsland-master\**" />
+    <AvaloniaResource Remove="ClassIsland-master\**" />
+    <EmbeddedResource Remove="ClassIsland-master\**" />
+    <None Remove="ClassIsland-master\**" />
+    <Compile Remove="ClassIsland-2.1.0.1\**" />
+    <AvaloniaXaml Remove="ClassIsland-2.1.0.1\**" />
+    <AvaloniaResource Remove="ClassIsland-2.1.0.1\**" />
+    <EmbeddedResource Remove="ClassIsland-2.1.0.1\**" />
+    <None Remove="ClassIsland-2.1.0.1\**" />
   </ItemGroup>
 
   <ItemGroup>

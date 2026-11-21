@@ -2,6 +2,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:FluentUSB.ViewModels"
+        xmlns:controls="using:FluentUSB.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="460" d:DesignHeight="360"
@@ -11,7 +12,6 @@
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/app.ico"
         Title="FluentUSB"
-        FontFamily="Segoe UI Variable Text, Segoe UI"
         Background="Transparent"
         TransparencyLevelHint="Transparent"
         TextOptions.TextRenderingMode="Antialias">
@@ -22,12 +22,23 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
+    <!--
+        与设置窗口共用 ClassIsland 的视觉语言：
+        列表项按 SettingsExpander 的规格做成 4px 圆角卡片（1px 描边 + 16 内边距），
+        图标 20px 一列，标题 14，说明 12，操作区靠右对齐。
+    -->
     <Window.Styles>
-        <!-- 文件列表行：Win11 的列表项就是 4px 圆角 + 悬停时一层很淡的填充 -->
+        <!-- 文件列表卡片：Win11 的卡片规格与 ClassIsland 设置行一致 -->
+        <Style Selector="Border.DriveCard">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
         <Style Selector="Button.DriveRow">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Padding" Value="12,10"/>
             <Setter Property="CornerRadius" Value="4"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -62,28 +73,34 @@
         <Style Selector="Button.IconOnly:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
         </Style>
-        <!-- 文字层级：标题 20 / 正文 14 / 说明 12 -->
-        <Style Selector="TextBlock.Caption">
-            <Setter Property="FontSize" Value="12"/>
+        <Style Selector="TextBlock.RowIcon">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="16"/>
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
-        </Style>
-        <Style Selector="TextBlock.CardHeader">
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
     </Window.Styles>
 
     <!-- 卡片底色叠在系统背景效果之上：避免壁纸背景下文字看不清 -->
     <Border x:Name="Surface" Background="{DynamicResource WindowSurfaceBrush}">
-        <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20,18,20,14">
+        <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20,18,20,14"
+              controls:IntroAnimation.Enabled="True">
 
-            <!-- 标题 + 监听状态 -->
-            <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding AppName}" FontSize="20" FontWeight="SemiBold"/>
+            <!-- 应用标识 + 监听状态 -->
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <Border Width="32" Height="32" CornerRadius="4"
+                        Background="{DynamicResource SystemControlBackgroundAccentBrush}"
+                        VerticalAlignment="Center">
+                    <TextBlock Text="&#xE88E;"
+                               FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                               FontSize="16" Foreground="#FFFFFFFF"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding AppName}" Classes="SubtitleText"/>
                     <TextBlock Text="{Binding Subtitle}" Classes="Caption"/>
                 </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                     <TextBlock Text="{Binding StatusText}" FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                VerticalAlignment="Center" Margin="0,0,6,0"/>
@@ -97,8 +114,10 @@
                 </StackPanel>
             </Grid>
 
-            <TextBlock Grid.Row="1" Margin="2,18,0,8" Text="已连接的 U 盘"
-                       Classes="CardHeader"/>
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="2,18,0,8">
+                <TextBlock Text="&#xE88E;" Classes="RowIcon"/>
+                <TextBlock Text="已连接的 U 盘" Classes="BodyStrong"/>
+            </StackPanel>
 
             <!-- 列表 / 空状态 -->
             <Grid Grid.Row="2">
@@ -106,68 +125,76 @@
                     <ItemsControl ItemsSource="{Binding DriveList}" Margin="0,0,-6,0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:UsbDriveViewModel">
-                                <Button Classes="DriveRow" Command="{Binding OpenDriveCommand}"
-                                        Margin="0,0,0,2" ToolTip.Tip="在资源管理器中打开">
-                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                <Border Classes="DriveCard" Margin="0,0,0,4">
+                                    <Button Classes="DriveRow" Command="{Binding OpenDriveCommand}"
+                                            ToolTip.Tip="在资源管理器中打开">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
 
-                                        <Grid Width="32" Height="32" VerticalAlignment="Center">
-                                            <Border CornerRadius="4" Opacity="0.14"
-                                                    Background="{DynamicResource SystemControlBackgroundAccentBrush}"/>
-                                            <TextBlock Text="&#xE88E;"
-                                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                                       FontSize="16"
-                                                       Foreground="{DynamicResource SystemControlBackgroundAccentBrush}"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Grid>
+                                            <Grid Width="32" Height="32" VerticalAlignment="Center">
+                                                <Border CornerRadius="4" Opacity="0.14"
+                                                        Background="{DynamicResource SystemControlBackgroundAccentBrush}"/>
+                                                <TextBlock Text="&#xE88E;"
+                                                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                           FontSize="16"
+                                                           Foreground="{DynamicResource SystemControlBackgroundAccentBrush}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Grid>
 
-                                        <StackPanel Grid.Column="1" Margin="12,0,8,0" Spacing="2"
-                                                    VerticalAlignment="Center">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock Text="{Binding DisplayName}"
-                                                           FontSize="14" FontWeight="SemiBold"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           VerticalAlignment="Center"/>
-                                                <Border CornerRadius="4" Padding="6,1"
-                                                        Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
-                                                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                                                        BorderThickness="1"
+                                            <StackPanel Grid.Column="1" Margin="16,0,8,0" Spacing="2"
                                                         VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding DriveLetter}" FontSize="11"
-                                                               FontWeight="SemiBold"
-                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                                                </Border>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="{Binding DisplayName}"
+                                                               FontSize="14" FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               VerticalAlignment="Center"/>
+                                                    <Border CornerRadius="4" Padding="6,1"
+                                                            Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
+                                                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                                            BorderThickness="1"
+                                                            VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding DriveLetter}" FontSize="11"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock FontSize="12"
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                           TextTrimming="CharacterEllipsis">
+                                                    <Run Text="{Binding SizeSummary}"/><Run Text=" · "/><Run Text="{Binding FormatText}"/>
+                                                </TextBlock>
                                             </StackPanel>
-                                            <TextBlock FontSize="12"
-                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                                       TextTrimming="CharacterEllipsis">
-                                                <Run Text="{Binding SizeSummary}"/><Run Text=" · "/><Run Text="{Binding FormatText}"/>
-                                            </TextBlock>
-                                        </StackPanel>
 
-                                        <TextBlock Grid.Column="2" Text="&#xE76C;"
-                                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                                   FontSize="12"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   VerticalAlignment="Center"/>
-                                    </Grid>
-                                </Button>
+                                            <TextBlock Grid.Column="2" Text="&#xE76C;"
+                                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+                                </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
 
-                <StackPanel IsVisible="{Binding !HasDrives}" Spacing="6"
+                <StackPanel IsVisible="{Binding !HasDrives}" Spacing="8"
                             HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="&#xE88E;"
-                               FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                               FontSize="28"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               HorizontalAlignment="Center"/>
+                    <Border Width="56" Height="56" CornerRadius="8"
+                            Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            HorizontalAlignment="Center">
+                        <TextBlock Text="&#xE88E;"
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="24"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
                     <TextBlock Text="还没有连接 U 盘" FontSize="14"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                               HorizontalAlignment="Center"/>
+                               HorizontalAlignment="Center" Margin="0,2,0,0"/>
                     <TextBlock Text="插入后会自动弹出提示，也可以从托盘菜单打开本窗口"
-                               FontSize="12" MaxWidth="280"
+                               FontSize="12" MaxWidth="320"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                TextWrapping="Wrap" TextAlignment="Center"
                                HorizontalAlignment="Center"/>
