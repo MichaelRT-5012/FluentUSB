@@ -21,6 +21,7 @@ public partial class SettingsWindow : Window, IAppearanceHost
     private int _sectionIndex;
     private CancellationTokenSource? _sectionHideCts;
     private SettingsViewModel? _viewModel;
+    private UsbToastWindow? _previewToast;
     private readonly TranslateTransform _indicatorTransform = new();
     private readonly DispatcherTimer _indicatorTimer;
     private double _indicatorVelocity;
@@ -33,7 +34,12 @@ public partial class SettingsWindow : Window, IAppearanceHost
         NavIndicator.RenderTransform = _indicatorTransform;
         _indicatorTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
         _indicatorTimer.Tick += OnIndicatorTick;
-        Closed += (_, _) => _indicatorTimer.Stop();
+        Closed += (_, _) =>
+        {
+            _indicatorTimer.Stop();
+            // 设置页关掉后不再留下预览弹窗
+            _previewToast?.Dismiss();
+        };
 
         Opened += (_, _) =>
         {
@@ -216,9 +222,23 @@ public partial class SettingsWindow : Window, IAppearanceHost
     /// <summary>用示例盘信息预览当前的插入弹窗外观（改完设置可直接看效果）。</summary>
     private void OnPreviewToastClick(object? sender, RoutedEventArgs e)
     {
+        // 复用同一个预览窗：连续点击只刷新倒计时，避免多个示例窗口叠在一起
+        if (_previewToast is { IsDismissed: false } preview)
+        {
+            preview.Restart();
+            return;
+        }
+
         var toast = new UsbToastWindow(new UsbDriveInfo(
             "D:", @"D:\", "示例 U 盘", "exFAT",
             15_902_400_000, 3_412_000_000));
+        toast.Closed += (_, _) =>
+        {
+            if (_previewToast == toast)
+                _previewToast = null;
+        };
+
+        _previewToast = toast;
         toast.Show();
     }
 }
