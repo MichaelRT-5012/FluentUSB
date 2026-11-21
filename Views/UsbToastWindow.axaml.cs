@@ -21,7 +21,7 @@ namespace FluentUSB.Views;
 public partial class UsbToastWindow : Window, IAppearanceHost
 {
     private readonly DispatcherTimer _countdownTimer;
-    private readonly TimeSpan _duration;
+    private TimeSpan _duration;
     private TimeSpan _remaining;
     private bool _paused;
     private bool _dismissed;
@@ -192,6 +192,28 @@ public partial class UsbToastWindow : Window, IAppearanceHost
     private void OnCloseButtonPointerPressed(object? sender, PointerPressedEventArgs e) => e.Handled = true;
 
     private void OnCloseClick(object? sender, RoutedEventArgs e) => Dismiss();
+
+    /// <summary>是否已进入退场流程（此时不能复用，只能等待关闭）。</summary>
+    public bool IsDismissed => _dismissed;
+
+    /// <summary>
+    /// 重新开始倒计时并重播入场动画，供设置页重复预览同一个弹窗。
+    /// 停留时长可能刚被改过，按最新设置重新计时。
+    /// </summary>
+    public void Restart()
+    {
+        if (_dismissed)
+            return;
+
+        _duration = TimeSpan.FromSeconds(SettingsStore.Current.PopupDurationSeconds);
+        _remaining = _duration;
+        Countdown.Value = 100;
+
+        RootCard.Classes.Add("Show");
+        _countdownTimer.Stop();
+        _countdownTimer.Start();
+        PositionOnScreen();
+    }
 
     /// <summary>播放退场动画后关闭窗口（可重复调用）。</summary>
     public void Dismiss()
