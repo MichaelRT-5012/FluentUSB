@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using FluentUSB.Models;
 using FluentUSB.Services;
 
@@ -24,6 +25,10 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>有 U 盘时显示列表，否则显示空状态。</summary>
     [ObservableProperty]
     private bool _hasDrives;
+
+    /// <summary>连点主窗口 5 次后显示示例 U 盘入口（调试用）。</summary>
+    [ObservableProperty]
+    private bool _isDemoRevealed;
 
     /// <summary>右上角监听状态文案。</summary>
     public string StatusText =>
@@ -59,6 +64,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
         UpdateState();
     }
+
+    /// <summary>显示示例 U 盘入口（主窗口连点 5 次触发）。</summary>
+    public void RevealDemo() => IsDemoRevealed = true;
+
+    /// <summary>把内置示例 U 盘加入列表，便于验证文件浏览器。</summary>
+    [RelayCommand]
+    private void AddDemoDrive() => AddDrive(DemoDriveCatalog.Drive);
 
     private async Task RefreshDrivesAsync()
     {

@@ -24,11 +24,14 @@ public partial class App : Application
 {
     // 当前存活的插入提示窗，顺序即叠放顺序（均为 UI 线程访问）
     private readonly List<UsbToastWindow> _usbToasts = [];
-    private readonly MainWindowViewModel _mainViewModel = new();
+    private MainWindowViewModel _mainViewModel = new();
     private MainWindow? _mainWindow;
     private SettingsWindow? _settingsWindow;
     private InstanceConflictWindow? _conflictWindow;
     private UsbDeviceMonitor? _usbMonitor;
+
+    // 每个盘符一个内建文件浏览器，重复打开时只激活已有窗口
+    private readonly Dictionary<string, FileExplorerWindow> _explorerWindows = new(StringComparer.OrdinalIgnoreCase);
 
     public override void Initialize()
     {
@@ -68,10 +71,19 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
-    /// <summary>启动参数：--show 打开主窗口，--settings 打开设置窗口（便于排障与脚本化验证）。</summary>
+    /// <summary>
+    /// 启动参数：--show 打开主窗口，--settings 打开设置窗口，--demo 注入示例 U 盘
+    /// （便于排障与脚本化验证）。
+    /// </summary>
     private void HandleStartupArguments(IClassicDesktopStyleApplicationLifetime desktop)
     {
         var args = desktop.Args ?? [];
+
+        if (args.Contains("--demo", StringComparer.OrdinalIgnoreCase))
+        {
+            _mainViewModel.AddDrive(DemoDriveCatalog.Drive);
+            ShowMainWindow();
+        }
 
         if (args.Contains("--show", StringComparer.OrdinalIgnoreCase))
             ShowMainWindow();
@@ -133,6 +145,9 @@ public partial class App : Application
         if (_conflictWindow is not null)
             yield return _conflictWindow;
 
+        foreach (var explorer in _explorerWindows.Values)
+            yield return explorer;
+
         foreach (var toast in _usbToasts)
             yield return toast;
     }
@@ -188,7 +203,7 @@ public partial class App : Application
         toast.Show();
     }
 
-    // U 盘拔出：收起对应提示窗，并从主窗口列表移除
+    // U 盘拔出：收起对应提示窗与文件浏览器，并从主窗口列表移除
     private void OnUsbDriveRemoved(string driveLetter)
     {
         _mainViewModel.RemoveDrive(driveLetter);
@@ -196,6 +211,9 @@ public partial class App : Application
         var toast = _usbToasts.FirstOrDefault(t => t.DriveLetter == driveLetter);
         if (toast is not null)
             RemoveToast(toast);
+
+        if (_explorerWindows.Remove(driveLetter, out var explorer))
+            explorer.Close();
     }
 
     private void OnToastClosed(object? sender, EventArgs e)
@@ -321,6 +339,29 @@ public partial class App : Application
 
         // 打开窗口时校正一次列表，避免漏收事件或启动时盘尚未就绪
         _mainViewModel.RefreshDrives();
+    }
+
+    /// <summary>
+    /// 打开某个 U 盘的内建文件浏览器；同一盘符只保留一个窗口。
+    /// </summary>
+    internal void OpenExplorer(UsbDriveInfo drive)
+    {
+        if (_explorerWindows.TryGetValue(drive.DriveLetter, out var existing))
+        {
+            if (!existing.IsVisible)
+                existing.Show();
+
+            existing.WindowState = WindowState.Normal;
+            existing.Activate();
+            return;
+        }
+
+        var window = new FileExplorerWindow(drive);
+        window.Closed += (_, _) => _explorerWindows.Remove(drive.DriveLetter);
+        _explorerWindows[drive.DriveLetter] = window;
+
+        window.Show();
+        window.Activate();
     }
 
     /// <summary>打开设置窗口（托盘菜单与主窗口齿轮共用同一个实例）。</summary>

@@ -104,6 +104,16 @@
                     <TextBlock Text="{Binding StatusText}" FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <!-- 调试入口：连点主窗口 5 次后出现，点击插入内置示例 U 盘 -->
+                    <Button Classes="IconOnly" ToolTip.Tip="插入示例 U 盘"
+                            IsVisible="{Binding IsDemoRevealed}"
+                            Command="{Binding AddDemoDriveCommand}">
+                        <TextBlock Text="&#xE88E;"
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="14"
+                                   Foreground="{DynamicResource SystemControlBackgroundAccentBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Button>
                     <Button Classes="IconOnly" ToolTip.Tip="设置" Click="OnSettingsClick">
                         <TextBlock Text="&#xE713;"
                                    FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
@@ -127,7 +137,7 @@
                             <DataTemplate x:DataType="vm:UsbDriveViewModel">
                                 <Border Classes="DriveCard" Margin="0,0,0,4">
                                     <Button Classes="DriveRow" Command="{Binding OpenDriveCommand}"
-                                            ToolTip.Tip="在资源管理器中打开">
+                                            ToolTip.Tip="打开">
                                         <Grid ColumnDefinitions="Auto,*,Auto">
 
                                             <Grid Width="32" Height="32" VerticalAlignment="Center">

@@ -1,0 +1,646 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:FluentUSB.ViewModels"
+        xmlns:models="using:FluentUSB.Models"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="920" d:DesignHeight="620"
+        x:Class="FluentUSB.Views.FileExplorerWindow"
+        x:DataType="vm:FileExplorerViewModel"
+        Icon="/Assets/app.ico"
+        Width="920" Height="620"
+        MinWidth="680" MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        TextOptions.TextRenderingMode="Antialias">
+
+    <!--
+        内建文件浏览器（M2）：工具栏 + 可点击排序的表头 + 文件列表。
+        视觉语言与主窗口/设置页一致：卡片圆角、Win11 文字层级、强调色 DodgerBlue。
+    -->
+    <Window.Styles>
+        <!-- 表头列：整列可点，悬停有弱底色，字号 12 + 次要文字色 -->
+        <Style Selector="Button.ColumnHeader">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="00:00:00.167"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.ColumnHeader:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="Button.ColumnHeader:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.ColumnTitle">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.SortGlyph">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlBackgroundAccentBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- 列宽拖拽手柄：压在列边界上，悬停显示强调色细线 -->
+        <Style Selector="Border.ColumnGrip">
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Margin" Value="0,0,-4,0"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Cursor" Value="SizeWestEast"/>
+        </Style>
+        <Style Selector="Border.ColumnGrip > Border">
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="00:00:00.1"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.ColumnGrip:pointerover > Border">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+
+        <!-- 顶部菜单栏（自绘浮层，便于做展开动画） -->
+        <Style Selector="Button.MenuBarButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinHeight" Value="30"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="00:00:00.167"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.MenuBarButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="Button.MenuBarButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="Button.MenuBarButton.open /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.MenuChevron">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="8"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- 菜单浮层 -->
+        <Style Selector="Border.MenuCard">
+            <Setter Property="Background" Value="{DynamicResource MenuCardBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="MinWidth" Value="200"/>
+            <Setter Property="BoxShadow" Value="0 8 24 -8 #66000000"/>
+        </Style>
+        <Style Selector="Button.MenuRow">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="00:00:00.167"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.MenuRow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="Button.MenuRow:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.MenuCheck">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlBackgroundAccentBrush}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.MenuText">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.MenuSeparator">
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Margin" Value="6,4"/>
+            <Setter Property="Background" Value="{DynamicResource DividerStrokeColorDefaultBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.MenuSubChevron">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="RenderTransform" Value="rotate(0deg)"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform"
+                                                  Duration="00:00:00.18" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="TextBlock.MenuSubChevron.expanded">
+            <Setter Property="RenderTransform" Value="rotate(90deg)"/>
+        </Style>
+
+        <!-- 二级菜单「分组依据」：高度 + 透明度平滑展开/收起 -->
+        <Style Selector="Border.GroupBySection">
+            <Setter Property="Height" Value="0"/>
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="ClipToBounds" Value="True"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Height" Duration="00:00:00.18" Easing="CubicEaseOut"/>
+                    <DoubleTransition Property="Opacity" Duration="00:00:00.16"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <!-- 分组内容区：展开/收起时高度与透明度平滑过渡 -->
+        <Style Selector="Border.GroupContent">
+            <Setter Property="ClipToBounds" Value="True"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Height" Duration="00:00:00.22" Easing="CubicEaseOut"/>
+                    <DoubleTransition Property="Opacity" Duration="00:00:00.16"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <!-- 文件行 -->
+        <Style Selector="Border.FileRow">
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="00:00:00.167"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.FileRow:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.ItemIcon">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.ItemIcon.folder">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlBackgroundAccentBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.CellText">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.NameText">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+        <!-- 分组标题行：整行可点，折叠时箭头转向 -->
+        <Style Selector="Button.GroupHeader">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="00:00:00.167"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.GroupHeader:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.GroupChevron">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="RenderTransform" Value="rotate(0deg)"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="00:00:00.15"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="TextBlock.GroupChevron.collapsed">
+            <Setter Property="RenderTransform" Value="rotate(-90deg)"/>
+        </Style>
+    </Window.Styles>
+
+    <!-- 文件行与分组行的模板：外层列表与分组内嵌列表共用 -->
+    <Window.DataTemplates>
+        <!-- 文件 / 文件夹行 -->
+        <DataTemplate DataType="models:FileEntry" x:DataType="models:FileEntry">
+            <Border Classes="FileRow">
+                <Grid Height="38" Margin="16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="{Binding $parent[Window].((vm:FileExplorerViewModel)DataContext).NameColumnWidth}"/>
+                        <ColumnDefinition Width="{Binding $parent[Window].((vm:FileExplorerViewModel)DataContext).ModifiedColumnWidth}"/>
+                        <ColumnDefinition Width="{Binding $parent[Window].((vm:FileExplorerViewModel)DataContext).TypeColumnWidth}"/>
+                        <ColumnDefinition Width="{Binding $parent[Window].((vm:FileExplorerViewModel)DataContext).SizeColumnWidth}"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding IconGlyph}" Classes="ItemIcon"
+                                   Classes.folder="{Binding IsDirectory}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Name}"
+                                   Margin="10,0,8,0" Classes="NameText"/>
+                    </Grid>
+                    <TextBlock Grid.Column="1" Text="{Binding ModifiedText}"
+                               Classes="CellText"/>
+                    <TextBlock Grid.Column="2" Text="{Binding TypeText}"
+                               Classes="CellText"/>
+                    <TextBlock Grid.Column="3" Text="{Binding SizeText}"
+                               Classes="CellText" TextAlignment="Right"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- 分组：标题行 + 可折叠内容区（高度过渡完成展开/收起） -->
+        <DataTemplate DataType="vm:FileGroupRow" x:DataType="vm:FileGroupRow">
+            <StackPanel>
+                <Button Classes="GroupHeader" Click="OnGroupHeaderClick"
+                        ToolTip.Tip="折叠或展开此分组">
+                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="16,0">
+                        <TextBlock Text="&#xE70D;" Classes="GroupChevron"
+                                   Classes.collapsed="{Binding !IsExpanded}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Title}"
+                                   Margin="10,0,8,0" FontSize="13" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Grid.Column="2" Text="{Binding CountText}"
+                                   FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                    </Grid>
+                </Button>
+                <Border Classes="GroupContent"
+                        Height="{Binding ExpandedHeight}" Opacity="{Binding ContentOpacity}">
+                    <ItemsControl ItemsSource="{Binding Entries}"/>
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+    </Window.DataTemplates>
+
+    <Border x:Name="Surface" Background="{DynamicResource WindowSurfaceBrush}">
+        <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+            <!-- 工具栏：盘符标识 + 盘名 + 路径，右侧项目数 -->
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="20,16,20,12">
+                <Grid Width="40" Height="40" VerticalAlignment="Center">
+                    <Border CornerRadius="6" Opacity="0.14"
+                            Background="{DynamicResource SystemControlBackgroundAccentBrush}"/>
+                    <TextBlock Text="&#xE88E;"
+                               FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                               FontSize="20"
+                               Foreground="{DynamicResource SystemControlBackgroundAccentBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Grid>
+
+                <StackPanel Grid.Column="1" Margin="14,0,12,0" Spacing="2"
+                            VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding DriveName}" FontSize="18" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                        <Border CornerRadius="4" Padding="6,1"
+                                Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
+                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding DriveLetter}" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding PathText}" Classes="Caption"/>
+                </StackPanel>
+
+                <TextBlock Grid.Column="2" Text="{Binding ItemCountText}" Classes="Caption"
+                           VerticalAlignment="Center"/>
+            </Grid>
+
+            <!-- 顶部菜单栏：排序、查看；每项右侧带下箭头提示可展开 -->
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*" Margin="10,0,10,2">
+                <Button x:Name="SortMenuButton" Classes="MenuBarButton" Click="OnSortMenuClick">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="排序" Classes="MenuText"/>
+                        <TextBlock Text="&#xE70D;" Classes="MenuChevron"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="ViewMenuButton" Grid.Column="1" Classes="MenuBarButton"
+                        Margin="2,0,0,0" Click="OnViewMenuClick">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="查看" Classes="MenuText"/>
+                        <TextBlock Text="&#xE70D;" Classes="MenuChevron"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <!-- 排序菜单浮层 -->
+            <Popup x:Name="SortPopup" Placement="BottomEdgeAlignedLeft"
+                   IsLightDismissEnabled="True" VerticalOffset="2"
+                   Opened="OnMenuPopupOpened">
+                <Border x:Name="SortPopupCard" Classes="MenuCard">
+                    <StackPanel>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding SortByCommand}" CommandParameter="Name">
+                            <Grid ColumnDefinitions="20,*,Auto">
+                                <TextBlock Text="&#xE73E;" Classes="MenuCheck"
+                                           IsVisible="{Binding IsNameSorted}"/>
+                                <TextBlock Grid.Column="1" Text="名称" Classes="MenuText"/>
+                                <TextBlock Grid.Column="2" Text="{Binding NameSortGlyph}"
+                                           Classes="SortGlyph" IsVisible="{Binding IsNameSorted}"/>
+                            </Grid>
+                        </Button>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding SortByCommand}" CommandParameter="Modified">
+                            <Grid ColumnDefinitions="20,*,Auto">
+                                <TextBlock Text="&#xE73E;" Classes="MenuCheck"
+                                           IsVisible="{Binding IsModifiedSorted}"/>
+                                <TextBlock Grid.Column="1" Text="修改时间" Classes="MenuText"/>
+                                <TextBlock Grid.Column="2" Text="{Binding ModifiedSortGlyph}"
+                                           Classes="SortGlyph" IsVisible="{Binding IsModifiedSorted}"/>
+                            </Grid>
+                        </Button>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding SortByCommand}" CommandParameter="Type">
+                            <Grid ColumnDefinitions="20,*,Auto">
+                                <TextBlock Text="&#xE73E;" Classes="MenuCheck"
+                                           IsVisible="{Binding IsTypeSorted}"/>
+                                <TextBlock Grid.Column="1" Text="类型" Classes="MenuText"/>
+                                <TextBlock Grid.Column="2" Text="{Binding TypeSortGlyph}"
+                                           Classes="SortGlyph" IsVisible="{Binding IsTypeSorted}"/>
+                            </Grid>
+                        </Button>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding SortByCommand}" CommandParameter="Size">
+                            <Grid ColumnDefinitions="20,*,Auto">
+                                <TextBlock Text="&#xE73E;" Classes="MenuCheck"
+                                           IsVisible="{Binding IsSizeSorted}"/>
+                                <TextBlock Grid.Column="1" Text="大小" Classes="MenuText"/>
+                                <TextBlock Grid.Column="2" Text="{Binding SizeSortGlyph}"
+                                           Classes="SortGlyph" IsVisible="{Binding IsSizeSorted}"/>
+                            </Grid>
+                        </Button>
+
+                        <Border Classes="MenuSeparator"/>
+
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding SortAscendingCommand}">
+                            <Grid ColumnDefinitions="20,*">
+                                <TextBlock Text="&#xE73E;" Classes="MenuCheck"
+                                           IsVisible="{Binding IsAscending}"/>
+                                <TextBlock Grid.Column="1" Text="递增" Classes="MenuText"/>
+                            </Grid>
+                        </Button>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding SortDescendingOrderCommand}">
+                            <Grid ColumnDefinitions="20,*">
+                                <TextBlock Text="&#xE73E;" Classes="MenuCheck"
+                                           IsVisible="{Binding IsDescending}"/>
+                                <TextBlock Grid.Column="1" Text="递减" Classes="MenuText"/>
+                            </Grid>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </Popup>
+
+            <!-- 查看菜单浮层：分组依据为可展开的二级菜单 -->
+            <Popup x:Name="ViewPopup" Placement="BottomEdgeAlignedLeft"
+                   IsLightDismissEnabled="True" VerticalOffset="2"
+                   Opened="OnMenuPopupOpened">
+                <Border x:Name="ViewPopupCard" Classes="MenuCard" MinWidth="220">
+                    <StackPanel>
+                        <Button Classes="MenuRow" Click="OnGroupByRowClick">
+                            <Grid ColumnDefinitions="20,*,Auto">
+                                <TextBlock Text="&#xE8B7;" Classes="MenuCheck" Opacity="0"/>
+                                <TextBlock Grid.Column="1" Text="分组依据" Classes="MenuText"/>
+                                <TextBlock x:Name="GroupByChevron" Grid.Column="2"
+                                           Text="&#xE76C;" Classes="MenuSubChevron"/>
+                            </Grid>
+                        </Button>
+
+                        <Border x:Name="GroupBySection" Classes="GroupBySection">
+                            <StackPanel Margin="0,2,0,2">
+                                <Button Classes="MenuRow" Padding="28,6" Click="OnMenuActionClick"
+                                        Command="{Binding SetGroupByCommand}" CommandParameter="None">
+                                    <Grid ColumnDefinitions="20,*">
+                                        <TextBlock Text="&#xE73E;" Classes="MenuCheck"
+                                                   IsVisible="{Binding IsGroupedByNone}"/>
+                                        <TextBlock Grid.Column="1" Text="无" Classes="MenuText"/>
+                                    </Grid>
+                                </Button>
+                                <Button Classes="MenuRow" Padding="28,6" Click="OnMenuActionClick"
+                                        Command="{Binding SetGroupByCommand}" CommandParameter="Name">
+                                    <Grid ColumnDefinitions="20,*">
+                                        <TextBlock Text="&#xE73E;" Classes="MenuCheck"
+                                                   IsVisible="{Binding IsGroupedByName}"/>
+                                        <TextBlock Grid.Column="1" Text="名称" Classes="MenuText"/>
+                                    </Grid>
+                                </Button>
+                                <Button Classes="MenuRow" Padding="28,6" Click="OnMenuActionClick"
+                                        Command="{Binding SetGroupByCommand}" CommandParameter="Modified">
+                                    <Grid ColumnDefinitions="20,*">
+                                        <TextBlock Text="&#xE73E;" Classes="MenuCheck"
+                                                   IsVisible="{Binding IsGroupedByModified}"/>
+                                        <TextBlock Grid.Column="1" Text="修改时间" Classes="MenuText"/>
+                                    </Grid>
+                                </Button>
+                                <Button Classes="MenuRow" Padding="28,6" Click="OnMenuActionClick"
+                                        Command="{Binding SetGroupByCommand}" CommandParameter="Type">
+                                    <Grid ColumnDefinitions="20,*">
+                                        <TextBlock Text="&#xE73E;" Classes="MenuCheck"
+                                                   IsVisible="{Binding IsGroupedByType}"/>
+                                        <TextBlock Grid.Column="1" Text="类型" Classes="MenuText"/>
+                                    </Grid>
+                                </Button>
+                                <Button Classes="MenuRow" Padding="28,6" Click="OnMenuActionClick"
+                                        Command="{Binding SetGroupByCommand}" CommandParameter="Size">
+                                    <Grid ColumnDefinitions="20,*">
+                                        <TextBlock Text="&#xE73E;" Classes="MenuCheck"
+                                                   IsVisible="{Binding IsGroupedBySize}"/>
+                                        <TextBlock Grid.Column="1" Text="大小" Classes="MenuText"/>
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="MenuSeparator"/>
+
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding ExpandAllGroupsCommand}">
+                            <TextBlock Text="展开所有分组" Classes="MenuText" Margin="20,0,0,0"/>
+                        </Button>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding CollapseAllGroupsCommand}">
+                            <TextBlock Text="折叠所有分组" Classes="MenuText" Margin="20,0,0,0"/>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </Popup>
+
+            <!-- 表头：点击列名切换升/降序，拖动列边界调整列宽；列宽与文件行共用 -->
+            <Border Grid.Row="2" Margin="16,0"
+                    BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                    BorderThickness="0,0,0,1">
+                <Grid x:Name="HeaderGrid" Margin="16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="{Binding NameColumnWidth}"/>
+                        <ColumnDefinition Width="{Binding ModifiedColumnWidth}"/>
+                        <ColumnDefinition Width="{Binding TypeColumnWidth}"/>
+                        <ColumnDefinition Width="{Binding SizeColumnWidth}"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Grid Grid.Column="0">
+                        <Button Classes="ColumnHeader" Command="{Binding SortByCommand}"
+                                CommandParameter="Name" ToolTip.Tip="按名称排序">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="名称" Classes="ColumnTitle"/>
+                                <TextBlock Text="{Binding NameSortGlyph}" Classes="SortGlyph"
+                                           IsVisible="{Binding IsNameSorted}"/>
+                            </StackPanel>
+                        </Button>
+                        <Border Classes="ColumnGrip" Tag="Name"
+                                ToolTip.Tip="拖动调整列宽"
+                                PointerPressed="OnGripPressed" PointerMoved="OnGripMoved"
+                                PointerReleased="OnGripReleased" PointerCaptureLost="OnGripCaptureLost">
+                            <Border Width="1" Margin="0,6"
+                                    Background="{DynamicResource SystemControlBackgroundAccentBrush}"
+                                    HorizontalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+
+                    <Grid Grid.Column="1">
+                        <Button Classes="ColumnHeader" Command="{Binding SortByCommand}"
+                                CommandParameter="Modified" ToolTip.Tip="按修改时间排序">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="修改时间" Classes="ColumnTitle"/>
+                                <TextBlock Text="{Binding ModifiedSortGlyph}" Classes="SortGlyph"
+                                           IsVisible="{Binding IsModifiedSorted}"/>
+                            </StackPanel>
+                        </Button>
+                        <Border Classes="ColumnGrip" Tag="Modified"
+                                ToolTip.Tip="拖动调整列宽"
+                                PointerPressed="OnGripPressed" PointerMoved="OnGripMoved"
+                                PointerReleased="OnGripReleased" PointerCaptureLost="OnGripCaptureLost">
+                            <Border Width="1" Margin="0,6"
+                                    Background="{DynamicResource SystemControlBackgroundAccentBrush}"
+                                    HorizontalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+
+                    <Grid Grid.Column="2">
+                        <Button Classes="ColumnHeader" Command="{Binding SortByCommand}"
+                                CommandParameter="Type" ToolTip.Tip="按类型排序">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="类型" Classes="ColumnTitle"/>
+                                <TextBlock Text="{Binding TypeSortGlyph}" Classes="SortGlyph"
+                                           IsVisible="{Binding IsTypeSorted}"/>
+                            </StackPanel>
+                        </Button>
+                        <Border Classes="ColumnGrip" Tag="Type"
+                                ToolTip.Tip="拖动调整列宽"
+                                PointerPressed="OnGripPressed" PointerMoved="OnGripMoved"
+                                PointerReleased="OnGripReleased" PointerCaptureLost="OnGripCaptureLost">
+                            <Border Width="1" Margin="0,6"
+                                    Background="{DynamicResource SystemControlBackgroundAccentBrush}"
+                                    HorizontalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+
+                    <Grid Grid.Column="3">
+                        <Button Classes="ColumnHeader" HorizontalContentAlignment="Right"
+                                Command="{Binding SortByCommand}"
+                                CommandParameter="Size" ToolTip.Tip="按大小排序">
+                            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
+                                <TextBlock Text="大小" Classes="ColumnTitle"/>
+                                <TextBlock Text="{Binding SizeSortGlyph}" Classes="SortGlyph"
+                                           IsVisible="{Binding IsSizeSorted}"/>
+                            </StackPanel>
+                        </Button>
+                        <Border Classes="ColumnGrip" Tag="Size"
+                                ToolTip.Tip="拖动调整列宽"
+                                PointerPressed="OnGripPressed" PointerMoved="OnGripMoved"
+                                PointerReleased="OnGripReleased" PointerCaptureLost="OnGripCaptureLost">
+                            <Border Width="1" Margin="0,6"
+                                    Background="{DynamicResource SystemControlBackgroundAccentBrush}"
+                                    HorizontalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- 文件列表 / 空状态 -->
+            <Grid Grid.Row="3" Margin="16,6,16,12">
+                <ScrollViewer IsVisible="{Binding HasItems}"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl x:Name="FileList" ItemsSource="{Binding Items}"/>
+                </ScrollViewer>
+
+                <StackPanel IsVisible="{Binding !HasItems}" Spacing="8"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border Width="56" Height="56" CornerRadius="8"
+                            Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            HorizontalAlignment="Center">
+                        <TextBlock Text="&#xE8B7;"
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="24"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="{Binding EmptyHint}" FontSize="14"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

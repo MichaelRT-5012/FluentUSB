@@ -40,6 +40,8 @@
                     <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#B3FFFFFF" />
                     <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#80F6F6F6" />
                     <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#0F000000" />
+                    <!-- 菜单浮层：90% 不透明，避免透出下方内容 -->
+                    <SolidColorBrush x:Key="MenuCardBackgroundBrush" Color="#E6F9F9F9" />
                     <!-- 控件填充与描边 -->
                     <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#B3FFFFFF" />
                     <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#80F9F9F9" />
@@ -67,6 +69,8 @@
                     <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#0DFFFFFF" />
                     <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#08FFFFFF" />
                     <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#19000000" />
+                    <!-- 菜单浮层：90% 不透明，避免透出下方内容 -->
+                    <SolidColorBrush x:Key="MenuCardBackgroundBrush" Color="#E62B2B2B" />
                     <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#0FFFFFFF" />
                     <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#15FFFFFF" />
                     <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#12FFFFFF" />

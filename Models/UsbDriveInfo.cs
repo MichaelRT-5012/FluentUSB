@@ -9,13 +9,15 @@ namespace FluentUSB.Models;
 /// <param name="DriveFormat">文件系统，如 NTFS / exFAT / FAT32。</param>
 /// <param name="TotalSize">总容量（字节）。</param>
 /// <param name="FreeSpace">可用空间（字节）。</param>
+/// <param name="IsDemo">是否为调试用的示例盘（内容为内置数据，不读真实磁盘）。</param>
 public sealed record UsbDriveInfo(
     string DriveLetter,
     string RootPath,
     string VolumeLabel,
     string DriveFormat,
     long TotalSize,
-    long FreeSpace)
+    long FreeSpace,
+    bool IsDemo = false)
 {
     /// <summary>展示名称：优先卷标，无卷标时兜底。</summary>
     public string DisplayName => string.IsNullOrWhiteSpace(VolumeLabel) ? "USB 磁盘" : VolumeLabel;
