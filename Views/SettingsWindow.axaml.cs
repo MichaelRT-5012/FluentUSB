@@ -1,8 +1,10 @@
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Animation;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -22,6 +24,8 @@ public partial class SettingsWindow : Window, IAppearanceHost
     private CancellationTokenSource? _sectionHideCts;
     private SettingsViewModel? _viewModel;
     private UsbToastWindow? _previewToast;
+    private int _aboutCardClicks;
+    private DateTime _lastAboutCardClick;
     private readonly TranslateTransform _indicatorTransform = new();
     private readonly DispatcherTimer _indicatorTimer;
     private double _indicatorVelocity;
@@ -88,14 +92,15 @@ public partial class SettingsWindow : Window, IAppearanceHost
 
         ContentScroller.Offset = default;
 
-        // 旧内容快速淡出
+        // 旧内容短促淡出，而不是瞬间消失
+        EnsureFade(outgoing);
         outgoing.Opacity = 0;
 
         incoming.IsVisible = true;
         incoming.Opacity = 1;
 
-        // 新内容按 ClassIsland 的 animated-intro 重新错峰上滑
-        Dispatcher.UIThread.Post(() => IntroAnimation.Restart(incoming), DispatcherPriority.Background);
+        // 同步复位子项（复位本身不带过渡），否则会先完整显示一帧再开始入场动画
+        IntroAnimation.Restart(incoming);
 
         // 淡出结束后隐藏旧内容；被快速切回时取消，避免误隐藏
         _sectionHideCts?.Cancel();
@@ -108,6 +113,22 @@ public partial class SettingsWindow : Window, IAppearanceHost
 
             Dispatcher.UIThread.Post(() => outgoing.IsVisible = false);
         }, TaskScheduler.Default);
+    }
+
+    /// <summary>分类面板的淡出过渡只挂一次。</summary>
+    private static void EnsureFade(Control panel)
+    {
+        if (panel.Transitions is not null)
+            return;
+
+        panel.Transitions = new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = Visual.OpacityProperty,
+                Duration = TimeSpan.FromMilliseconds(150),
+            },
+        };
     }
 
     /// <summary>把选中指示条滑到当前分类（弹簧阻尼，带一点回弹）。</summary>
@@ -192,6 +213,42 @@ public partial class SettingsWindow : Window, IAppearanceHost
     }
 
     private void OnCloseClick(object? sender, RoutedEventArgs e) => Close();
+
+    /// <summary>关于页的应用卡片连点 5 次才显示构建时间（排障用，不打扰普通用户）。</summary>
+    private void OnAboutAppCardClick(object? sender, RoutedEventArgs e)
+    {
+        var now = DateTime.UtcNow;
+        if (now - _lastAboutCardClick > TimeSpan.FromSeconds(1.5))
+            _aboutCardClicks = 0;
+        _lastAboutCardClick = now;
+
+        if (++_aboutCardClicks < 5)
+            return;
+
+        _aboutCardClicks = 0;
+        BuildTimeRow.IsVisible = true;
+    }
+
+    private void OnOpenSettingsFolderClick(object? sender, RoutedEventArgs e) =>
+        OpenFolder((DataContext as SettingsViewModel)?.SettingsFolderPath);
+
+    private void OnOpenLogFolderClick(object? sender, RoutedEventArgs e) =>
+        OpenFolder((DataContext as SettingsViewModel)?.LogFolderPath);
+
+    private static void OpenFolder(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"打开目录失败：{path}", ex);
+        }
+    }
 
     /// <summary>用示例盘信息预览当前的插入弹窗外观（改完设置可直接看效果）。</summary>
     private void OnPreviewToastClick(object? sender, RoutedEventArgs e)

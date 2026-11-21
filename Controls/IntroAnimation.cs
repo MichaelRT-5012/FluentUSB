@@ -94,9 +94,11 @@ public static class IntroAnimation
 
             foreach (var c in targets)
             {
-                EnsureTransitions(c);
+                // 先摘掉上一轮的过渡再复位，避免从终态缓慢"倒放"回起点造成闪烁
+                c.Transitions = null;
                 c.Opacity = 0;
                 c.RenderTransform = HiddenTransform;
+                EnsureTransitions(c);
             }
 
             var index = 0;

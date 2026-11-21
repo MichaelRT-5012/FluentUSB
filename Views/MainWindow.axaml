@@ -83,7 +83,7 @@
 
     <!-- 卡片底色叠在系统背景效果之上：避免壁纸背景下文字看不清 -->
     <Border x:Name="Surface" Background="{DynamicResource WindowSurfaceBrush}">
-        <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20,18,20,14"
+        <Grid RowDefinitions="Auto,Auto,*" Margin="20,18,20,14"
               controls:IntroAnimation.Enabled="True">
 
             <!-- 应用标识 + 监听状态 -->
@@ -193,17 +193,8 @@
                     <TextBlock Text="还没有连接 U 盘" FontSize="14"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                HorizontalAlignment="Center" Margin="0,2,0,0"/>
-                    <TextBlock Text="插入后会自动弹出提示，也可以从托盘菜单打开本窗口"
-                               FontSize="12" MaxWidth="320"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               TextWrapping="Wrap" TextAlignment="Center"
-                               HorizontalAlignment="Center"/>
                 </StackPanel>
             </Grid>
-
-            <TextBlock Grid.Row="3" Margin="2,10,0,0" FontSize="12"
-                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                       Text="点击列表中的 U 盘可在资源管理器中打开"/>
         </Grid>
     </Border>
 </Window>

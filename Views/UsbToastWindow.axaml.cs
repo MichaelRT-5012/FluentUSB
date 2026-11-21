@@ -78,7 +78,10 @@ public partial class UsbToastWindow : Window, IAppearanceHost
 
         if (windowStyle)
         {
-            // 整窗式没有余量画自绘阴影，边框也交给系统材质
+            // 整窗式没有余量画自绘阴影，边框也交给系统材质；
+            // 窗口缩到与卡片式可见区域等大，避免整窗式显得比卡片式大一圈
+            Width = 344;
+            Height = 92;
             RootCard.Margin = default;
             RootCard.CornerRadius = default;
             RootCard.BorderThickness = default;
@@ -86,6 +89,8 @@ public partial class UsbToastWindow : Window, IAppearanceHost
         }
         else
         {
+            Width = 360;
+            Height = 108;
             RootCard.Margin = new Thickness(8);
             RootCard.CornerRadius = new CornerRadius(8);
             RootCard.BorderThickness = new Thickness(1);
@@ -98,6 +103,10 @@ public partial class UsbToastWindow : Window, IAppearanceHost
             BackdropNative.SetRoundedCorners(handle.Handle, windowStyle);
 
         BackdropService.Apply(this);
+
+        // 尺寸可能变化（切换绘制方式），重新贴边避免位置错位
+        if (IsVisible)
+            PositionOnScreen();
     }
 
     /// <summary>该弹窗对应的盘符（如 "D:"），用于去重与拔出时回收。</summary>

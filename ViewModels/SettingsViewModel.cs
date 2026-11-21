@@ -75,11 +75,10 @@ public partial class SettingsViewModel : ObservableObject
                 SelectToastBackdrop));
         }
 
-        CapabilityText = capabilities.Description;
-
         var build = capabilities.Build;
         SystemText = $"{(build >= 22000 ? "Windows 11" : "Windows 10")}（内部版本 {build}）";
         SettingsFilePath = SettingsStore.SettingsFilePath;
+        SettingsFolderPath = Path.GetDirectoryName(SettingsStore.SettingsFilePath) ?? string.Empty;
         LogFolderPath = Log.DirectoryPath;
 
         var version = typeof(SettingsViewModel).Assembly.GetName().Version;
@@ -117,12 +116,13 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>插入弹窗的可选背景效果（仅整窗式生效）。</summary>
     public ObservableCollection<BackdropOptionViewModel> ToastBackdropOptions { get; } = [];
 
-    /// <summary>当前系统与可用效果说明。</summary>
-    public string CapabilityText { get; }
-
     /// <summary>侧边栏当前分类：0 外观 / 1 关于。</summary>
     [ObservableProperty]
     private int _sectionIndex;
+
+    /// <summary>「背景效果」卡片是否展开；默认收起，点击标题行后展开。</summary>
+    [ObservableProperty]
+    private bool _isBackdropExpanded;
 
     public bool IsAppearanceSection => SectionIndex == 0;
 
@@ -143,10 +143,10 @@ public partial class SettingsViewModel : ObservableObject
 
     public string SettingsFilePath { get; }
 
-    public string LogFolderPath { get; }
+    /// <summary>设置文件所在目录，供「打开」按钮直接打开。</summary>
+    public string SettingsFolderPath { get; }
 
-    public string AboutDescription { get; } =
-        "常驻托盘的 U 盘助手：插入后自动弹出提示，可快速打开 U 盘并查看容量信息。";
+    public string LogFolderPath { get; }
 
     partial void OnSectionIndexChanged(int value)
     {
@@ -268,6 +268,10 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>切换到「关于」分类。</summary>
     [RelayCommand]
     private void ShowAbout() => SectionIndex = 1;
+
+    /// <summary>展开/收起「背景效果」选项列表。</summary>
+    [RelayCommand]
+    private void ToggleBackdropExpanded() => IsBackdropExpanded = !IsBackdropExpanded;
 
     /// <summary>恢复默认设置（背景回退为当前系统首选效果）。</summary>
     [RelayCommand]
