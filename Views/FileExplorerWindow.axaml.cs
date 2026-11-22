@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using Avalonia;
 using Avalonia.Animation;
@@ -80,6 +81,7 @@ public partial class FileExplorerWindow : Window, IAppearanceHost
         ViewPopup.Closed += (_, _) => ViewMenuButton.Classes.Set("open", false);
 
         _viewModel.Rebuilt += OnListRebuilt;
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         // 窗口显示后才有句柄，此时才能应用原生背景效果
         Opened += (_, _) => BackdropService.Apply(this);
@@ -88,12 +90,129 @@ public partial class FileExplorerWindow : Window, IAppearanceHost
         {
             _rowTimer?.Stop();
             _viewModel.Rebuilt -= OnListRebuilt;
+            _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             SortPopup.IsOpen = false;
             ViewPopup.IsOpen = false;
         };
     }
 
     public Border? SurfaceHost => Surface;
+
+    // ---------- 文件行交互 ----------
+
+    private void OnRowPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Border { DataContext: FileEntry entry })
+            return;
+
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            return;
+
+        _viewModel.SelectEntry(
+            entry,
+            ctrl: e.KeyModifiers.HasFlag(KeyModifiers.Control),
+            shift: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+
+        e.Handled = true;
+    }
+
+    private void OnRowDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is Border { DataContext: FileEntry entry })
+        {
+            _viewModel.Open(entry);
+            e.Handled = true;
+        }
+    }
+
+    // 点击列表空白处取消选择（点滚动条时不清空）
+    private void OnListBackgroundPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            return;
+
+        if (e.Source is Visual visual
+            && visual.GetSelfAndVisualAncestors().OfType<ScrollBar>().Any())
+            return;
+
+        _viewModel.ClearSelection();
+    }
+
+    // ---------- 键盘快捷键 ----------
+
+    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (_viewModel.IsRenamePromptVisible)
+        {
+            if (e.Key == Key.Enter)
+            {
+                _viewModel.ConfirmRenameCommand.Execute(null);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                _viewModel.CancelRenameCommand.Execute(null);
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        if (_viewModel.IsDeletePromptVisible)
+        {
+            if (e.Key == Key.Escape)
+            {
+                _viewModel.CancelDeleteCommand.Execute(null);
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+
+        switch (e.Key)
+        {
+            case Key.Delete when _viewModel.DeleteCommand.CanExecute(null):
+                _viewModel.DeleteCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.F2 when _viewModel.RenameCommand.CanExecute(null):
+                _viewModel.RenameCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.A when ctrl:
+                _viewModel.SelectAllCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.C when ctrl && _viewModel.CopyCommand.CanExecute(null):
+                _viewModel.CopyCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.X when ctrl && _viewModel.CutCommand.CanExecute(null):
+                _viewModel.CutCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.V when ctrl && _viewModel.PasteCommand.CanExecute(null):
+                _viewModel.PasteCommand.Execute(null);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(FileExplorerViewModel.IsRenamePromptVisible)
+            || !_viewModel.IsRenamePromptVisible)
+            return;
+
+        // 浮层出现后聚焦输入框并全选文件名
+        Dispatcher.UIThread.Post(() =>
+        {
+            RenameBox.Focus();
+            RenameBox.SelectAll();
+        }, DispatcherPriority.Background);
+    }
 
     // ---------- 顶部菜单 ----------
 

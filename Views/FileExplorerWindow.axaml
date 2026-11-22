@@ -14,6 +14,7 @@
         WindowStartupLocation="CenterScreen"
         Background="Transparent"
         TransparencyLevelHint="Transparent"
+        KeyDown="OnWindowKeyDown"
         TextOptions.TextRenderingMode="Antialias">
 
     <!--
@@ -78,16 +79,16 @@
             <Setter Property="Opacity" Value="1"/>
         </Style>
 
-        <!-- 顶部菜单栏（自绘浮层，便于做展开动画） -->
-        <Style Selector="Button.MenuBarButton">
+        <!-- 顶部命令栏按钮（Win11 资源管理器风格：图标 + 文字） -->
+        <Style Selector="Button.CommandButton">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Padding" Value="8,4"/>
             <Setter Property="Height" Value="30"/>
             <Setter Property="MinHeight" Value="30"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Transitions">
                 <Transitions>
@@ -95,14 +96,51 @@
                 </Transitions>
             </Setter>
         </Style>
-        <Style Selector="Button.MenuBarButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Style Selector="Button.CommandButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
         </Style>
-        <Style Selector="Button.MenuBarButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Style Selector="Button.CommandButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
         </Style>
-        <Style Selector="Button.MenuBarButton.open /template/ ContentPresenter#PART_ContentPresenter">
+        <Style Selector="Button.CommandButton.open /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.CommandIcon">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.CommandText">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- 导航按钮：后退 / 上一级 / 刷新 -->
+        <Style Selector="Button.NavButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinHeight" Value="30"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="00:00:00.167"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.NavButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.NavIcon">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
         <Style Selector="TextBlock.MenuChevron">
             <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
@@ -202,6 +240,16 @@
             </Setter>
         </Style>
 
+        <!-- 窗口内的确认 / 输入浮层 -->
+        <Style Selector="Border.DialogCard">
+            <Setter Property="Background" Value="{DynamicResource MenuCardBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="20"/>
+            <Setter Property="BoxShadow" Value="0 12 32 -8 #66000000"/>
+        </Style>
+
         <!-- 文件行 -->
         <Style Selector="Border.FileRow">
             <Setter Property="CornerRadius" Value="4"/>
@@ -214,6 +262,9 @@
         </Style>
         <Style Selector="Border.FileRow:pointerover">
             <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="Border.FileRow.selected">
+            <Setter Property="Background" Value="{DynamicResource FileSelectionBrush}"/>
         </Style>
         <Style Selector="TextBlock.ItemIcon">
             <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
@@ -281,7 +332,8 @@
     <Window.DataTemplates>
         <!-- 文件 / 文件夹行 -->
         <DataTemplate DataType="models:FileEntry" x:DataType="models:FileEntry">
-            <Border Classes="FileRow">
+            <Border Classes="FileRow" Classes.selected="{Binding IsSelected}"
+                    PointerPressed="OnRowPressed" DoubleTapped="OnRowDoubleTapped">
                 <Grid Height="38" Margin="16,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="{Binding $parent[Window].((vm:FileExplorerViewModel)DataContext).NameColumnWidth}"/>
@@ -332,54 +384,114 @@
     <Border x:Name="Surface" Background="{DynamicResource WindowSurfaceBrush}">
         <Grid RowDefinitions="Auto,Auto,Auto,*">
 
-            <!-- 工具栏：盘符标识 + 盘名 + 路径，右侧项目数 -->
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="20,16,20,12">
-                <Grid Width="40" Height="40" VerticalAlignment="Center">
-                    <Border CornerRadius="6" Opacity="0.14"
-                            Background="{DynamicResource SystemControlBackgroundAccentBrush}"/>
-                    <TextBlock Text="&#xE88E;"
-                               FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                               FontSize="20"
-                               Foreground="{DynamicResource SystemControlBackgroundAccentBrush}"
-                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Grid>
-
-                <StackPanel Grid.Column="1" Margin="14,0,12,0" Spacing="2"
-                            VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="{Binding DriveName}" FontSize="18" FontWeight="SemiBold"
-                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                        <Border CornerRadius="4" Padding="6,1"
-                                Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
-                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                                BorderThickness="1" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding DriveLetter}" FontSize="11" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                        </Border>
+            <!-- 工具栏：导航 + 盘符标识 + 盘名 + 当前路径，右侧项目数 -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="20,16,20,10">
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="2">
+                        <Button Classes="NavButton" Command="{Binding GoBackCommand}"
+                                IsEnabled="{Binding CanGoBack}" ToolTip.Tip="后退">
+                            <TextBlock Text="&#xE72B;" Classes="NavIcon"/>
+                        </Button>
+                        <Button Classes="NavButton" Command="{Binding GoUpCommand}"
+                                IsEnabled="{Binding CanGoUp}" ToolTip.Tip="上一级">
+                            <TextBlock Text="&#xE74A;" Classes="NavIcon"/>
+                        </Button>
+                        <Button Classes="NavButton" Command="{Binding RefreshCommand}"
+                                ToolTip.Tip="刷新">
+                            <TextBlock Text="&#xE72C;" Classes="NavIcon"/>
+                        </Button>
                     </StackPanel>
-                    <TextBlock Text="{Binding PathText}" Classes="Caption"/>
+
+                    <Grid Width="40" Height="40" VerticalAlignment="Center">
+                        <Border CornerRadius="6" Opacity="0.14"
+                                Background="{DynamicResource SystemControlBackgroundAccentBrush}"/>
+                        <TextBlock Text="&#xE88E;"
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="20"
+                                   Foreground="{DynamicResource SystemControlBackgroundAccentBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding DriveName}" FontSize="18" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                            <Border CornerRadius="4" Padding="6,1"
+                                    Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
+                                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding DriveLetter}" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Text="{Binding PathText}" Classes="Caption"
+                                   MaxWidth="560" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
                 </StackPanel>
 
-                <TextBlock Grid.Column="2" Text="{Binding ItemCountText}" Classes="Caption"
+                <TextBlock Grid.Column="1" Text="{Binding ItemCountText}" Classes="Caption"
                            VerticalAlignment="Center"/>
             </Grid>
 
-            <!-- 顶部菜单栏：排序、查看；每项右侧带下箭头提示可展开 -->
-            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*" Margin="10,0,10,2">
-                <Button x:Name="SortMenuButton" Classes="MenuBarButton" Click="OnSortMenuClick">
+            <!-- 顶部命令栏：常用操作 + 排序 / 查看菜单（图标与 Win11 资源管理器一致） -->
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="2" Margin="16,0,16,4">
+                <Button Classes="CommandButton" Command="{Binding NewFolderCommand}"
+                        ToolTip.Tip="新建文件夹">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                        <TextBlock Text="排序" Classes="MenuText"/>
+                        <TextBlock Text="&#xE8F4;" Classes="CommandIcon"/>
+                        <TextBlock Text="新建文件夹" Classes="CommandText"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="CommandButton" Command="{Binding CutCommand}" ToolTip.Tip="剪切">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="&#xE8C6;" Classes="CommandIcon"/>
+                        <TextBlock Text="剪切" Classes="CommandText"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="CommandButton" Command="{Binding CopyCommand}" ToolTip.Tip="复制">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="&#xE8C8;" Classes="CommandIcon"/>
+                        <TextBlock Text="复制" Classes="CommandText"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="CommandButton" Command="{Binding PasteCommand}" ToolTip.Tip="粘贴">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="&#xE77F;" Classes="CommandIcon"/>
+                        <TextBlock Text="粘贴" Classes="CommandText"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="CommandButton" Command="{Binding RenameCommand}" ToolTip.Tip="重命名">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="&#xE8AC;" Classes="CommandIcon"/>
+                        <TextBlock Text="重命名" Classes="CommandText"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="CommandButton" Command="{Binding DeleteCommand}" ToolTip.Tip="删除">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="&#xE74D;" Classes="CommandIcon"/>
+                        <TextBlock Text="删除" Classes="CommandText"/>
+                    </StackPanel>
+                </Button>
+
+                <Border Width="1" Margin="6,6" Background="{DynamicResource DividerStrokeColorDefaultBrush}"/>
+
+                <Button x:Name="SortMenuButton" Classes="CommandButton" Click="OnSortMenuClick"
+                        ToolTip.Tip="排序">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="&#xE8CB;" Classes="CommandIcon"/>
+                        <TextBlock Text="排序" Classes="CommandText"/>
                         <TextBlock Text="&#xE70D;" Classes="MenuChevron"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="ViewMenuButton" Grid.Column="1" Classes="MenuBarButton"
-                        Margin="2,0,0,0" Click="OnViewMenuClick">
+                <Button x:Name="ViewMenuButton" Classes="CommandButton" Click="OnViewMenuClick"
+                        ToolTip.Tip="查看">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                        <TextBlock Text="查看" Classes="MenuText"/>
+                        <TextBlock Text="&#xE890;" Classes="CommandIcon"/>
+                        <TextBlock Text="查看" Classes="CommandText"/>
                         <TextBlock Text="&#xE70D;" Classes="MenuChevron"/>
                     </StackPanel>
                 </Button>
-            </Grid>
+            </StackPanel>
 
             <!-- 排序菜单浮层 -->
             <Popup x:Name="SortPopup" Placement="BottomEdgeAlignedLeft"
@@ -616,7 +728,7 @@
             </Border>
 
             <!-- 文件列表 / 空状态 -->
-            <Grid Grid.Row="3" Margin="16,6,16,12">
+            <Grid Grid.Row="3" Margin="16,6,16,12" PointerPressed="OnListBackgroundPressed">
                 <ScrollViewer IsVisible="{Binding HasItems}"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
@@ -640,6 +752,69 @@
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
+            </Grid>
+
+            <!-- 文件操作进度浮层（复制 / 移动 / 删除） -->
+            <Grid Grid.RowSpan="4" Panel.ZIndex="20" IsVisible="{Binding IsOperationInProgress}"
+                  Background="#66000000">
+                <Border Classes="DialogCard" Width="420"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="{Binding OperationTitle}" FontSize="18" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding OperationDetail}" FontSize="13"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <ProgressBar Minimum="0" Maximum="100" Height="4"
+                                     Value="{Binding OperationPercent}"
+                                     IsIndeterminate="{Binding IsOperationIndeterminate}"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{Binding OperationItemsText}" FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" Content="取消" MinWidth="80"
+                                    IsVisible="{Binding CanCancelOperation}"
+                                    Command="{Binding CancelOperationCommand}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 删除确认浮层 -->
+            <Grid Grid.RowSpan="4" Panel.ZIndex="10" IsVisible="{Binding IsDeletePromptVisible}"
+                  Background="#66000000">
+                <Border Classes="DialogCard" Width="360"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="删除项目" FontSize="18" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding DeletePromptText}" FontSize="13" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                            <Button Content="取消" MinWidth="80"
+                                    Command="{Binding CancelDeleteCommand}"/>
+                            <Button Content="删除" MinWidth="80"
+                                    Command="{Binding ConfirmDeleteCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 重命名浮层 -->
+            <Grid Grid.RowSpan="4" Panel.ZIndex="10" IsVisible="{Binding IsRenamePromptVisible}"
+                  Background="#66000000">
+                <Border Classes="DialogCard" Width="360"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="重命名" FontSize="18" FontWeight="SemiBold"/>
+                        <TextBox x:Name="RenameBox" Text="{Binding RenameText, Mode=TwoWay}"
+                                 FontSize="13"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                            <Button Content="取消" MinWidth="80"
+                                    Command="{Binding CancelRenameCommand}"/>
+                            <Button Content="确定" MinWidth="80"
+                                    Command="{Binding ConfirmRenameCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Grid>
     </Border>

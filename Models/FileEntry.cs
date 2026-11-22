@@ -1,5 +1,5 @@
 using System;
-using System.IO;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace FluentUSB.Models;
 
@@ -24,10 +24,30 @@ public enum FileGroupBy
 
 /// <summary>
 /// 文件浏览器中的一行（文件夹或文件）。
-/// M2 阶段只展示示例盘数据，字段与真实文件系统的 DirectoryInfo / FileInfo 对齐。
+/// 字段与真实文件系统的 DirectoryInfo / FileInfo 对齐；示例盘的路径为虚拟的 DEMO:\ 路径。
 /// </summary>
-public sealed record FileEntry(string Name, bool IsDirectory, DateTime Modified, long Size)
+public sealed partial class FileEntry : ObservableObject
 {
+    public FileEntry(string path, string name, bool isDirectory, DateTime modified, long size)
+    {
+        Path = path;
+        Name = name;
+        IsDirectory = isDirectory;
+        Modified = modified;
+        Size = size;
+    }
+
+    /// <summary>完整路径，用于打开、复制、删除等操作。</summary>
+    public string Path { get; }
+
+    public string Name { get; }
+
+    public bool IsDirectory { get; }
+
+    public DateTime Modified { get; }
+
+    public long Size { get; }
+
     public string ModifiedText => Modified.ToString("yyyy/MM/dd HH:mm");
 
     public string SizeText => IsDirectory ? string.Empty : FormatBytes(Size);
@@ -42,7 +62,7 @@ public sealed record FileEntry(string Name, bool IsDirectory, DateTime Modified,
             if (IsDirectory)
                 return "\uE8B7";
 
-            return Path.GetExtension(Name).ToLowerInvariant() switch
+            return System.IO.Path.GetExtension(Name).ToLowerInvariant() switch
             {
                 ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".svg" => "\uEB9F",
                 ".mp4" or ".mkv" or ".mov" or ".avi" => "\uE714",
@@ -54,9 +74,13 @@ public sealed record FileEntry(string Name, bool IsDirectory, DateTime Modified,
         }
     }
 
+    /// <summary>是否被选中（供复制/删除等命令使用）。</summary>
+    [ObservableProperty]
+    private bool _isSelected;
+
     private static string DescribeType(string name)
     {
-        var extension = Path.GetExtension(name).ToLowerInvariant();
+        var extension = System.IO.Path.GetExtension(name).ToLowerInvariant();
         return extension switch
         {
             "" => "文件",
