@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Animation.Easings;
@@ -10,6 +12,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Transformation;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FluentUSB.Models;
@@ -46,12 +49,38 @@ public partial class FileExplorerWindow : Window, IAppearanceHost
         TransformOperations.Parse("translateY(28px)");
     private static readonly TransformOperations RowShownTransform =
         TransformOperations.Parse("translateY(0px)");
+    // 切换文件夹：旧文件向左甩出，新文件从右侧甩入；返回父级时方向相反
+    private static readonly TransformOperations RowExitLeftTransform =
+        TransformOperations.Parse("translateX(-220px)");
+    private static readonly TransformOperations RowHiddenFromRightTransform =
+        TransformOperations.Parse("translateX(220px)");
+    private static readonly TransformOperations RowExitRightTransform =
+        TransformOperations.Parse("translateX(220px)");
+    private static readonly TransformOperations RowHiddenFromLeftTransform =
+        TransformOperations.Parse("translateX(-220px)");
+
+    private bool _isNavigating;
+    private bool _suppressListAnimation;
+
+    // 拖放过程中的文件路径缓存（一次拖放只解析一次）
+    private List<string>? _dragFilePaths;
 
     // 「分组依据」二级菜单展开后的高度：5 行 × 34 + 上下留白
     private const double GroupByMenuHeight = 174;
 
     private readonly FileExplorerViewModel _viewModel;
     private DispatcherTimer? _rowTimer;
+
+    // 触屏长按弹出右键菜单
+    private DispatcherTimer? _holdTimer;
+    private Border? _holdRow;
+    private Point _holdStart;
+
+    // 鼠标拖拽：按住行后移动超过阈值才开始拖出
+    private PointerPressedEventArgs? _dragPressed;
+    private FileEntry? _dragEntry;
+    private Point _dragStartPoint;
+    private Border? _dropRow;
 
     private ResizeTarget _resizeTarget;
     private double _resizeStartX;
@@ -75,6 +104,7 @@ public partial class FileExplorerWindow : Window, IAppearanceHost
         // 浮层锚定到菜单栏按钮（放置目标必须显式指定）
         SortPopup.PlacementTarget = SortMenuButton;
         ViewPopup.PlacementTarget = ViewMenuButton;
+        RowMenuPopup.PlacementTarget = this;
 
         // 通过点击空白处收起时，同步复位按钮的激活态
         SortPopup.Closed += (_, _) => SortMenuButton.Classes.Set("open", false);
@@ -83,16 +113,31 @@ public partial class FileExplorerWindow : Window, IAppearanceHost
         _viewModel.Rebuilt += OnListRebuilt;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
+        // 触屏滚动时取消长按，避免滚动过程中误弹菜单
+        AddHandler(ScrollViewer.ScrollChangedEvent, (_, _) => CancelHold());
+
+        // 拖入文件：走 Avalonia 的托管拖放通道。
+        // DragDrop.AllowDrop 是「继承型」附加属性，在窗口上开启后整棵可视树都会成为拖放目标；
+        // 不开启的话 DragDropDevice 找不到目标，资源管理器里的光标会一直是「打叉」。
+        DragDrop.SetAllowDrop(this, true);
+        AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
+        AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
+        AddHandler(DragDrop.DropEvent, OnDrop);
+
         // 窗口显示后才有句柄，此时才能应用原生背景效果
         Opened += (_, _) => BackdropService.Apply(this);
         ActualThemeVariantChanged += (_, _) => BackdropService.Apply(this);
         Closed += (_, _) =>
         {
             _rowTimer?.Stop();
+            CancelHold();
+            ClearDropHighlight();
             _viewModel.Rebuilt -= OnListRebuilt;
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             SortPopup.IsOpen = false;
             ViewPopup.IsOpen = false;
+            RowMenuPopup.IsOpen = false;
         };
     }
 
@@ -102,10 +147,23 @@ public partial class FileExplorerWindow : Window, IAppearanceHost
 
     private void OnRowPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not Border { DataContext: FileEntry entry })
+        if (sender is not Border { DataContext: FileEntry entry } row)
             return;
 
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        var point = e.GetCurrentPoint(this);
+
+        // 右键：先选中该行，再弹出右键菜单
+        if (point.Properties.IsRightButtonPressed)
+        {
+            if (!entry.IsSelected)
+                _viewModel.SelectEntry(entry, ctrl: false, shift: false);
+
+            RowMenuPopup.IsOpen = true;
+            e.Handled = true;
+            return;
+        }
+
+        if (!point.Properties.IsLeftButtonPressed)
             return;
 
         _viewModel.SelectEntry(
@@ -113,29 +171,442 @@ public partial class FileExplorerWindow : Window, IAppearanceHost
             ctrl: e.KeyModifiers.HasFlag(KeyModifiers.Control),
             shift: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
 
+        // 触屏长按弹出同一份菜单
+        if (e.Pointer.Type == PointerType.Touch)
+        {
+            _holdStart = e.GetPosition(this);
+            StartHold(row);
+            return;
+        }
+
+        // 鼠标：记录起点并捕获指针，移动超过阈值后开始拖拽
+        _dragPressed = e;
+        _dragEntry = entry;
+        _dragStartPoint = e.GetPosition(this);
+        e.Pointer.Capture(row);
+
         e.Handled = true;
     }
 
-    private void OnRowDoubleTapped(object? sender, TappedEventArgs e)
+    private async void OnRowPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (sender is Border { DataContext: FileEntry entry })
+        if (_dragPressed is not null)
         {
-            _viewModel.Open(entry);
-            e.Handled = true;
+            if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            {
+                _dragPressed = null;
+                _dragEntry = null;
+            }
+            else
+            {
+                var current = e.GetPosition(this);
+                if (Math.Abs(current.X - _dragStartPoint.X) > 6
+                    || Math.Abs(current.Y - _dragStartPoint.Y) > 6)
+                    await BeginDragAsync();
+            }
+        }
+
+        if (_holdRow is null)
+            return;
+
+        var position = e.GetPosition(this);
+        if (Math.Abs(position.X - _holdStart.X) > 8 || Math.Abs(position.Y - _holdStart.Y) > 8)
+            CancelHold();
+    }
+
+    private void OnRowPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        _dragPressed = null;
+        _dragEntry = null;
+        e.Pointer.Capture(null);
+        CancelHold();
+    }
+
+    private void OnRowPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        _dragPressed = null;
+        _dragEntry = null;
+        CancelHold();
+    }
+
+    // ---------- 拖出到资源管理器 / 拖入窗口 ----------
+
+    private async Task BeginDragAsync()
+    {
+        var pressed = _dragPressed;
+        var entry = _dragEntry;
+        _dragPressed = null;
+        _dragEntry = null;
+
+        if (pressed is null || entry is null || _viewModel.IsDemoDrive)
+            return;
+
+        // 只允许鼠标拖拽，避免与触屏滚动、长按冲突
+        if (pressed.Pointer.Type != PointerType.Mouse)
+            return;
+
+        var provider = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (provider is null)
+            return;
+
+        if (!entry.IsSelected)
+            _viewModel.SelectEntry(entry, ctrl: false, shift: false);
+
+        var data = new DataTransfer();
+
+        foreach (var path in _viewModel.GetDragPaths(entry))
+        {
+            try
+            {
+                var isDirectory = Directory.Exists(path);
+                IStorageItem? storage = isDirectory
+                    ? await provider.TryGetFolderFromPathAsync(path)
+                    : await provider.TryGetFileFromPathAsync(path);
+
+                if (storage is not null)
+                    data.Add(DataTransferItem.CreateFile(storage));
+            }
+            catch
+            {
+                // 单个条目无法转换时跳过
+            }
+        }
+
+        if (data.Items.Count == 0)
+            return;
+
+        // OLE 拖拽接管指针前释放本地捕获
+        pressed.Pointer.Capture(null);
+
+        try
+        {
+            await DragDrop.DoDragDropAsync(pressed, data,
+                DragDropEffects.Copy | DragDropEffects.Move);
+        }
+        catch
+        {
+            // 拖拽被取消时忽略
         }
     }
 
-    // 点击列表空白处取消选择（点滚动条时不清空）
-    private void OnListBackgroundPressed(object? sender, PointerPressedEventArgs e)
+    // ---------- 托管拖放（资源管理器 → 本窗口） ----------
+
+    /// <summary>拖放悬停进入：决定允许的效果并准备文件列表。</summary>
+    private void OnDragEnter(object? sender, DragEventArgs e)
     {
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        _dragFilePaths = null;
+        var paths = GetDragFilePaths(e);
+
+        Log.Info($"拖放进入：文件 {paths.Count} 个，可写入={_viewModel.CanAcceptDrop}");
+        e.DragEffects = ResolveDropEffects(paths);
+    }
+
+    /// <summary>拖放悬停移动：更新落点高亮。</summary>
+    private void OnDragOver(object? sender, DragEventArgs e)
+    {
+        var paths = GetDragFilePaths(e);
+        e.DragEffects = ResolveDropEffects(paths);
+
+        if (e.DragEffects == DragDropEffects.None)
+        {
+            ClearDropHighlight();
+            return;
+        }
+
+        var (directory, row) = ResolveDropTargetFromClient(e.GetPosition(this));
+        SetDropHighlightRow(row);
+    }
+
+    /// <summary>拖放离开：清理高亮与缓存。</summary>
+    private void OnDragLeave(object? sender, DragEventArgs e)
+    {
+        _dragFilePaths = null;
+        ClearDropHighlight();
+    }
+
+    /// <summary>放下文件：复制（或移动）到落点目录。</summary>
+    private void OnDrop(object? sender, DragEventArgs e)
+    {
+        var paths = GetDragFilePaths(e);
+        _dragFilePaths = null;
+        ClearDropHighlight();
+
+        if (!_viewModel.CanAcceptDrop)
+        {
+            Log.Info("拖放被忽略：当前不可写入（示例盘或正在执行操作）");
+            e.DragEffects = DragDropEffects.None;
+            return;
+        }
+
+        if (paths.Count == 0)
+        {
+            Log.Info("拖放被忽略：未读到文件路径");
+            e.DragEffects = DragDropEffects.None;
+            return;
+        }
+
+        var (directory, _) = ResolveDropTargetFromClient(e.GetPosition(this));
+        directory ??= _viewModel.PathText;
+
+        // 资源管理器里按住 Shift 表示移动，默认复制
+        var move = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        e.DragEffects = move ? DragDropEffects.Move : DragDropEffects.Copy;
+
+        Log.Info($"拖放落点：目标={directory}，文件数={paths.Count}，移动={move}");
+        Log.Info($"拖放文件：{string.Join("、", paths.Take(10))}{(paths.Count > 10 ? " …" : string.Empty)}");
+
+        _ = SafeDropAsync(paths, directory, move);
+    }
+
+    /// <summary>当前拖放允许的效果：不可写入或没有文件时一律拒绝。</summary>
+    private DragDropEffects ResolveDropEffects(List<string> paths) =>
+        paths.Count > 0 && _viewModel.CanAcceptDrop
+            ? DragDropEffects.Copy | DragDropEffects.Move
+            : DragDropEffects.None;
+
+    /// <summary>取出拖放中的本地文件路径（一次拖放只解析一次）。</summary>
+    private List<string> GetDragFilePaths(DragEventArgs e)
+    {
+        if (_dragFilePaths is not null)
+            return _dragFilePaths;
+
+        var paths = new List<string>();
+
+        try
+        {
+            var files = e.DataTransfer.TryGetFiles();
+            if (files is not null)
+            {
+                foreach (var file in files)
+                {
+                    var path = file.TryGetLocalPath();
+                    if (!string.IsNullOrEmpty(path))
+                        paths.Add(path);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("读取拖放文件失败", ex);
+        }
+
+        // 只缓存成功解析到的结果：空结果留待下次事件重试，
+        // 避免一次瞬时失败让整次拖放都被判定为「不可放入」
+        if (paths.Count > 0)
+            _dragFilePaths = paths;
+
+        return paths;
+    }
+
+    private async Task SafeDropAsync(List<string> paths, string directory, bool move)
+    {
+        try
+        {
+            await _viewModel.DropTransferAsync(paths, directory, move);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("拖放复制失败", ex);
+        }
+    }
+
+    /// <summary>
+    /// 拖放目标：按窗口客户区坐标命中文件夹行则进入该文件夹，否则落在当前目录。
+    /// 指针不在文件列表区域时返回 (null, null)（由调用方决定是否落到当前目录）。
+    /// </summary>
+    private (string? Directory, Border? Row) ResolveDropTargetFromClient(Point clientInWindow)
+    {
+        var position = this.TranslatePoint(clientInWindow, FileList);
+        if (!position.HasValue)
+            return (_viewModel.PathText, null);
+
+        var p = position.Value;
+        if (p.X < 0 || p.Y < 0
+            || p.X > FileList.Bounds.Width || p.Y > FileList.Bounds.Height)
+            return (null, null);
+
+        if (FileList.InputHitTest(p) is Visual hit)
+        {
+            foreach (var ancestor in hit.GetSelfAndVisualAncestors())
+            {
+                if (ancestor is Border border
+                    && border.Classes.Contains("FileRow")
+                    && border.DataContext is FileEntry { IsDirectory: true } folder)
+                    return (folder.Path, border);
+            }
+        }
+
+        return (_viewModel.PathText, null);
+    }
+
+    private void SetDropHighlightRow(Border? row)
+    {
+        if (ReferenceEquals(_dropRow, row))
             return;
 
+        _dropRow?.Classes.Set("dropTarget", false);
+        _dropRow = row;
+        _dropRow?.Classes.Set("dropTarget", true);
+    }
+
+    private void ClearDropHighlight()
+    {
+        _dropRow?.Classes.Set("dropTarget", false);
+        _dropRow = null;
+    }
+
+    private void StartHold(Border row)
+    {
+        CancelHold();
+        _holdRow = row;
+
+        _holdTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(550) };
+        _holdTimer.Tick += (_, _) =>
+        {
+            CancelHold();
+
+            if (row.DataContext is not FileEntry entry)
+                return;
+
+            if (!entry.IsSelected)
+                _viewModel.SelectEntry(entry, ctrl: false, shift: false);
+
+            RowMenuPopup.IsOpen = true;
+        };
+
+        _holdTimer.Start();
+    }
+
+    private void CancelHold()
+    {
+        _holdTimer?.Stop();
+        _holdTimer = null;
+        _holdRow = null;
+    }
+
+    private async void OnRowDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not Border { DataContext: FileEntry entry })
+            return;
+
+        e.Handled = true;
+
+        if (entry.IsDirectory)
+        {
+            await NavigateAnimatedAsync(reverse: false, () => _viewModel.Open(entry));
+            return;
+        }
+
+        _viewModel.Open(entry);
+    }
+
+    // 上一级 / 后退：方向与进入子文件夹相反
+    private async void OnGoUpClick(object? sender, RoutedEventArgs e)
+    {
+        if (!_viewModel.CanGoUp)
+            return;
+
+        await NavigateAnimatedAsync(reverse: true, () => _viewModel.TryGoUp());
+    }
+
+    private async void OnGoBackClick(object? sender, RoutedEventArgs e)
+    {
+        if (!_viewModel.CanGoBack)
+            return;
+
+        await NavigateAnimatedAsync(reverse: true, () => _viewModel.TryGoBack());
+    }
+
+    /// <summary>
+    /// 目录切换动画：当前文件快速甩出，约 40ms 后新内容以反向甩入。
+    /// reverse 为 true 时方向相反（返回父级 / 后退）。
+    /// </summary>
+    private async Task NavigateAnimatedAsync(bool reverse, Action navigate)
+    {
+        if (_isNavigating)
+            return;
+
+        _isNavigating = true;
+
+        try
+        {
+            var exitTransform = reverse ? RowExitRightTransform : RowExitLeftTransform;
+            var enterTransform = reverse ? RowHiddenFromLeftTransform : RowHiddenFromRightTransform;
+
+            // 双击/点击后立刻开始甩出，不等它播完
+            StartRowsExit(GetListRows(), exitTransform);
+
+            // 甩出刚开始就把新内容甩进来，衔接更紧凑
+            await Task.Delay(40);
+
+            FileList.Opacity = 0;
+            _suppressListAnimation = true;
+            navigate();
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                _suppressListAnimation = false;
+                FileList.Opacity = 1;
+                AnimateRows(GetListRows(), enterTransform, 140, 3, new CubicEaseOut());
+            }, DispatcherPriority.Background);
+        }
+        finally
+        {
+            _isNavigating = false;
+        }
+    }
+
+    private void StartRowsExit(IReadOnlyList<Control> rows, TransformOperations exitTransform)
+    {
+        if (rows.Count == 0)
+            return;
+
+        const int staggerMs = 2;
+        const int durationMs = 100;
+
+        try
+        {
+            _rowTimer?.Stop();
+
+            for (var i = 0; i < rows.Count; i++)
+            {
+                var row = rows[i];
+                var delay = Math.Min(i, 16) * staggerMs;
+
+                DispatcherTimer.RunOnce(() =>
+                {
+                    // 甩出：越走越快（加速）
+                    row.Transitions = CreateRowTransitions(durationMs, new CubicEaseIn());
+                    row.Opacity = 0;
+                    row.RenderTransform = exitTransform;
+                }, TimeSpan.FromMilliseconds(delay));
+            }
+        }
+        catch
+        {
+            // 动画失败时直接切换
+        }
+    }
+
+    // 点击列表空白处取消选择；右键空白处弹出菜单（点在滚动条上时忽略）
+    private void OnListBackgroundPressed(object? sender, PointerPressedEventArgs e)
+    {
         if (e.Source is Visual visual
             && visual.GetSelfAndVisualAncestors().OfType<ScrollBar>().Any())
             return;
 
-        _viewModel.ClearSelection();
+        var point = e.GetCurrentPoint(this);
+
+        if (point.Properties.IsRightButtonPressed)
+        {
+            _viewModel.ClearSelection();
+            RowMenuPopup.IsOpen = true;
+            e.Handled = true;
+            return;
+        }
+
+        if (point.Properties.IsLeftButtonPressed)
+            _viewModel.ClearSelection();
     }
 
     // ---------- 键盘快捷键 ----------
@@ -237,6 +708,7 @@ public partial class FileExplorerWindow : Window, IAppearanceHost
         {
             SortPopup.IsOpen = false;
             ViewPopup.IsOpen = false;
+            RowMenuPopup.IsOpen = false;
             SortMenuButton.Classes.Set("open", false);
             ViewMenuButton.Classes.Set("open", false);
         }, DispatcherPriority.Background);
@@ -303,6 +775,13 @@ public partial class FileExplorerWindow : Window, IAppearanceHost
         if (kind == FileListChangeKind.Initial)
             return;
 
+        // 文件夹切换自带甩入动画，跳过通用入场
+        if (_suppressListAnimation)
+        {
+            _suppressListAnimation = false;
+            return;
+        }
+
         Dispatcher.UIThread.Post(() =>
         {
             if (kind == FileListChangeKind.SortDirection)
@@ -333,7 +812,7 @@ public partial class FileExplorerWindow : Window, IAppearanceHost
 
     /// <summary>让指定行走同一套淡入 + 位移动画，按行错峰。</summary>
     private void AnimateRows(IReadOnlyList<Control> rows, TransformOperations hidden,
-        int durationMs, int staggerMs)
+        int durationMs, int staggerMs, Easing? easing = null)
     {
         try
         {
@@ -364,7 +843,7 @@ public partial class FileExplorerWindow : Window, IAppearanceHost
                 }
 
                 var row = rows[index++];
-                row.Transitions = CreateRowTransitions(durationMs);
+                row.Transitions = CreateRowTransitions(durationMs, easing);
                 row.Opacity = 1;
                 row.RenderTransform = RowShownTransform;
             };
@@ -387,9 +866,9 @@ public partial class FileExplorerWindow : Window, IAppearanceHost
         (control is Border border && border.Classes.Contains("FileRow"))
         || (control is Button button && button.Classes.Contains("GroupHeader"));
 
-    private static Transitions CreateRowTransitions(int durationMs)
+    private static Transitions CreateRowTransitions(int durationMs, Easing? easing = null)
     {
-        var easing = new CubicEaseOut();
+        easing ??= new CubicEaseOut();
         return new Transitions
         {
             new DoubleTransition

@@ -183,6 +183,16 @@
         <Style Selector="Button.MenuRow:pressed /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
         </Style>
+        <!-- 禁用的菜单项：只让文字变灰，不改变整行背景 -->
+        <Style Selector="Button.MenuRow:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.MenuRow:disabled TextBlock.MenuText">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorDisabledBrush}"/>
+        </Style>
+        <Style Selector="Button.MenuRow:disabled TextBlock.MenuIcon">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorDisabledBrush}"/>
+        </Style>
         <Style Selector="TextBlock.MenuCheck">
             <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
             <Setter Property="FontSize" Value="11"/>
@@ -192,6 +202,13 @@
         </Style>
         <Style Selector="TextBlock.MenuText">
             <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.MenuIcon">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style Selector="Border.MenuSeparator">
@@ -266,6 +283,10 @@
         <Style Selector="Border.FileRow.selected">
             <Setter Property="Background" Value="{DynamicResource FileSelectionBrush}"/>
         </Style>
+        <!-- 拖放悬停到文件夹行时的提示 -->
+        <Style Selector="Border.FileRow.dropTarget">
+            <Setter Property="Background" Value="{DynamicResource FileSelectionBrush}"/>
+        </Style>
         <Style Selector="TextBlock.ItemIcon">
             <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
             <Setter Property="FontSize" Value="16"/>
@@ -333,7 +354,11 @@
         <!-- 文件 / 文件夹行 -->
         <DataTemplate DataType="models:FileEntry" x:DataType="models:FileEntry">
             <Border Classes="FileRow" Classes.selected="{Binding IsSelected}"
-                    PointerPressed="OnRowPressed" DoubleTapped="OnRowDoubleTapped">
+                    PointerPressed="OnRowPressed"
+                    PointerMoved="OnRowPointerMoved"
+                    PointerReleased="OnRowPointerReleased"
+                    PointerCaptureLost="OnRowPointerCaptureLost"
+                    DoubleTapped="OnRowDoubleTapped">
                 <Grid Height="38" Margin="16,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="{Binding $parent[Window].((vm:FileExplorerViewModel)DataContext).NameColumnWidth}"/>
@@ -381,18 +406,19 @@
         </DataTemplate>
     </Window.DataTemplates>
 
-    <Border x:Name="Surface" Background="{DynamicResource WindowSurfaceBrush}">
+    <Border x:Name="Surface" Background="{DynamicResource WindowSurfaceBrush}"
+            DragDrop.AllowDrop="True">
         <Grid RowDefinitions="Auto,Auto,Auto,*">
 
             <!-- 工具栏：导航 + 盘符标识 + 盘名 + 当前路径，右侧项目数 -->
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="20,16,20,10">
                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Spacing="2">
-                        <Button Classes="NavButton" Command="{Binding GoBackCommand}"
+                        <Button Classes="NavButton" Click="OnGoBackClick"
                                 IsEnabled="{Binding CanGoBack}" ToolTip.Tip="后退">
                             <TextBlock Text="&#xE72B;" Classes="NavIcon"/>
                         </Button>
-                        <Button Classes="NavButton" Command="{Binding GoUpCommand}"
+                        <Button Classes="NavButton" Click="OnGoUpClick"
                                 IsEnabled="{Binding CanGoUp}" ToolTip.Tip="上一级">
                             <TextBlock Text="&#xE74A;" Classes="NavIcon"/>
                         </Button>
@@ -501,42 +527,34 @@
                     <StackPanel>
                         <Button Classes="MenuRow" Click="OnMenuActionClick"
                                 Command="{Binding SortByCommand}" CommandParameter="Name">
-                            <Grid ColumnDefinitions="20,*,Auto">
+                            <Grid ColumnDefinitions="20,*">
                                 <TextBlock Text="&#xE73E;" Classes="MenuCheck"
                                            IsVisible="{Binding IsNameSorted}"/>
                                 <TextBlock Grid.Column="1" Text="名称" Classes="MenuText"/>
-                                <TextBlock Grid.Column="2" Text="{Binding NameSortGlyph}"
-                                           Classes="SortGlyph" IsVisible="{Binding IsNameSorted}"/>
                             </Grid>
                         </Button>
                         <Button Classes="MenuRow" Click="OnMenuActionClick"
                                 Command="{Binding SortByCommand}" CommandParameter="Modified">
-                            <Grid ColumnDefinitions="20,*,Auto">
+                            <Grid ColumnDefinitions="20,*">
                                 <TextBlock Text="&#xE73E;" Classes="MenuCheck"
                                            IsVisible="{Binding IsModifiedSorted}"/>
                                 <TextBlock Grid.Column="1" Text="修改时间" Classes="MenuText"/>
-                                <TextBlock Grid.Column="2" Text="{Binding ModifiedSortGlyph}"
-                                           Classes="SortGlyph" IsVisible="{Binding IsModifiedSorted}"/>
                             </Grid>
                         </Button>
                         <Button Classes="MenuRow" Click="OnMenuActionClick"
                                 Command="{Binding SortByCommand}" CommandParameter="Type">
-                            <Grid ColumnDefinitions="20,*,Auto">
+                            <Grid ColumnDefinitions="20,*">
                                 <TextBlock Text="&#xE73E;" Classes="MenuCheck"
                                            IsVisible="{Binding IsTypeSorted}"/>
                                 <TextBlock Grid.Column="1" Text="类型" Classes="MenuText"/>
-                                <TextBlock Grid.Column="2" Text="{Binding TypeSortGlyph}"
-                                           Classes="SortGlyph" IsVisible="{Binding IsTypeSorted}"/>
                             </Grid>
                         </Button>
                         <Button Classes="MenuRow" Click="OnMenuActionClick"
                                 Command="{Binding SortByCommand}" CommandParameter="Size">
-                            <Grid ColumnDefinitions="20,*,Auto">
+                            <Grid ColumnDefinitions="20,*">
                                 <TextBlock Text="&#xE73E;" Classes="MenuCheck"
                                            IsVisible="{Binding IsSizeSorted}"/>
                                 <TextBlock Grid.Column="1" Text="大小" Classes="MenuText"/>
-                                <TextBlock Grid.Column="2" Text="{Binding SizeSortGlyph}"
-                                           Classes="SortGlyph" IsVisible="{Binding IsSizeSorted}"/>
                             </Grid>
                         </Button>
 
@@ -631,6 +649,75 @@
                         <Button Classes="MenuRow" Click="OnMenuActionClick"
                                 Command="{Binding CollapseAllGroupsCommand}">
                             <TextBlock Text="折叠所有分组" Classes="MenuText" Margin="20,0,0,0"/>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </Popup>
+
+            <!-- 文件 / 空白处右键菜单（触屏长按同样弹出） -->
+            <Popup x:Name="RowMenuPopup" Placement="Pointer" IsLightDismissEnabled="True"
+                   HorizontalOffset="4" VerticalOffset="4"
+                   Opened="OnMenuPopupOpened">
+                <Border Classes="MenuCard" MinWidth="200">
+                    <StackPanel>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding OpenSelectedCommand}">
+                            <Grid ColumnDefinitions="24,*">
+                                <TextBlock Text="&#xE8E5;" Classes="MenuIcon"/>
+                                <TextBlock Grid.Column="1" Text="打开" Classes="MenuText"/>
+                            </Grid>
+                        </Button>
+                        <Border Classes="MenuSeparator"/>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding CutCommand}">
+                            <Grid ColumnDefinitions="24,*">
+                                <TextBlock Text="&#xE8C6;" Classes="MenuIcon"/>
+                                <TextBlock Grid.Column="1" Text="剪切" Classes="MenuText"/>
+                            </Grid>
+                        </Button>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding CopyCommand}">
+                            <Grid ColumnDefinitions="24,*">
+                                <TextBlock Text="&#xE8C8;" Classes="MenuIcon"/>
+                                <TextBlock Grid.Column="1" Text="复制" Classes="MenuText"/>
+                            </Grid>
+                        </Button>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding PasteCommand}">
+                            <Grid ColumnDefinitions="24,*">
+                                <TextBlock Text="&#xE77F;" Classes="MenuIcon"/>
+                                <TextBlock Grid.Column="1" Text="粘贴" Classes="MenuText"/>
+                            </Grid>
+                        </Button>
+                        <Border Classes="MenuSeparator"/>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding RenameCommand}">
+                            <Grid ColumnDefinitions="24,*">
+                                <TextBlock Text="&#xE8AC;" Classes="MenuIcon"/>
+                                <TextBlock Grid.Column="1" Text="重命名" Classes="MenuText"/>
+                            </Grid>
+                        </Button>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding DeleteCommand}">
+                            <Grid ColumnDefinitions="24,*">
+                                <TextBlock Text="&#xE74D;" Classes="MenuIcon"/>
+                                <TextBlock Grid.Column="1" Text="删除" Classes="MenuText"/>
+                            </Grid>
+                        </Button>
+                        <Border Classes="MenuSeparator"/>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding NewFolderCommand}">
+                            <Grid ColumnDefinitions="24,*">
+                                <TextBlock Text="&#xE8F4;" Classes="MenuIcon"/>
+                                <TextBlock Grid.Column="1" Text="新建文件夹" Classes="MenuText"/>
+                            </Grid>
+                        </Button>
+                        <Button Classes="MenuRow" Click="OnMenuActionClick"
+                                Command="{Binding RefreshCommand}">
+                            <Grid ColumnDefinitions="24,*">
+                                <TextBlock Text="&#xE72C;" Classes="MenuIcon"/>
+                                <TextBlock Grid.Column="1" Text="刷新" Classes="MenuText"/>
+                            </Grid>
                         </Button>
                     </StackPanel>
                 </Border>
@@ -757,24 +844,59 @@
             <!-- 文件操作进度浮层（复制 / 移动 / 删除） -->
             <Grid Grid.RowSpan="4" Panel.ZIndex="20" IsVisible="{Binding IsOperationInProgress}"
                   Background="#66000000">
-                <Border Classes="DialogCard" Width="420"
+                <Border Classes="DialogCard" Width="430"
                         HorizontalAlignment="Center" VerticalAlignment="Center">
                     <StackPanel Spacing="14">
                         <TextBlock Text="{Binding OperationTitle}" FontSize="18" FontWeight="SemiBold"/>
                         <TextBlock Text="{Binding OperationDetail}" FontSize="13"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                    TextTrimming="CharacterEllipsis"/>
-                        <ProgressBar Minimum="0" Maximum="100" Height="4"
-                                     Value="{Binding OperationPercent}"
-                                     IsIndeterminate="{Binding IsOperationIndeterminate}"/>
+
+                        <!-- 进度条：圆角轨道 + 强调色渐变填充 -->
                         <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Text="{Binding OperationItemsText}" FontSize="12"
-                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                       VerticalAlignment="Center"/>
-                            <Button Grid.Column="1" Content="取消" MinWidth="80"
+                            <Border Height="8" CornerRadius="4" ClipToBounds="True"
+                                    Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                                <ProgressBar Minimum="0" Maximum="100" Height="8"
+                                             Background="Transparent"
+                                             Value="{Binding OperationPercent}"
+                                             IsIndeterminate="{Binding IsOperationIndeterminate}">
+                                    <ProgressBar.Foreground>
+                                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                                            <GradientStop Color="#1E90FF" Offset="0"/>
+                                            <GradientStop Color="#5CC8FF" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </ProgressBar.Foreground>
+                                </ProgressBar>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding OperationPercentText}"
+                                       MinWidth="42" TextAlignment="Right" Margin="10,0,0,0"
+                                       FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- 项目数 / 已写入大小 / 实时速度 -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="{Binding OperationItemsText}" FontSize="12"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                <TextBlock Text="{Binding OperationSizeText}" FontSize="12"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4" HorizontalAlignment="Right">
+                                <TextBlock Text="{Binding OperationSpeedText}" FontSize="12"
+                                           FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                                <TextBlock Text="当前速度" FontSize="11" HorizontalAlignment="Right"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                            <Button Content="{Binding OperationPauseText}" MinWidth="80"
+                                    IsVisible="{Binding CanPauseOperation}"
+                                    Command="{Binding TogglePauseOperationCommand}"/>
+                            <Button Content="取消" MinWidth="80"
                                     IsVisible="{Binding CanCancelOperation}"
                                     Command="{Binding CancelOperationCommand}"/>
-                        </Grid>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </Grid>

@@ -15,8 +15,15 @@ using FluentUSB.Services;
 
 namespace FluentUSB.ViewModels;
 
-/// <summary>文件操作进度快照：百分比、当前条目、项目计数文案。</summary>
-public sealed record FileOperationProgress(double Percent, string Detail, string ItemsText);
+/// <summary>文件操作进度快照：百分比、当前条目、项目数、字节数与实时速度。</summary>
+public sealed record FileOperationProgress(
+    double Percent,
+    string Detail,
+    int DoneItems,
+    int TotalItems,
+    long DoneBytes,
+    long TotalBytes,
+    double BytesPerSecond);
 
 /// <summary>列表重建的原因，用于让窗口选择不同的动画。</summary>
 public enum FileListChangeKind
@@ -51,6 +58,9 @@ public partial class FileExplorerViewModel : ViewModelBase
     private FileEntry? _selectionAnchor;
     private FileEntry? _renameEntry;
     private CancellationTokenSource? _operationCts;
+
+    // 暂停/继续复制的闸门：Reset 时后台线程阻塞，Set 后继续
+    private ManualResetEventSlim? _operationGate;
 
     public FileExplorerViewModel(UsbDriveInfo drive)
     {
@@ -131,7 +141,24 @@ public partial class FileExplorerViewModel : ViewModelBase
     private string _operationItemsText = string.Empty;
 
     [ObservableProperty]
+    private string _operationSizeText = string.Empty;
+
+    [ObservableProperty]
+    private string _operationSpeedText = string.Empty;
+
+    [ObservableProperty]
     private bool _canCancelOperation;
+
+    [ObservableProperty]
+    private bool _canPauseOperation;
+
+    [ObservableProperty]
+    private bool _isOperationPaused;
+
+    public string OperationPauseText => IsOperationPaused ? "继续" : "暂停";
+
+    public string OperationPercentText =>
+        IsOperationIndeterminate ? "—" : $"{OperationPercent:0}%";
 
     /// <summary>各列宽度：表头与文件行共用，保证列边界完全对齐，并支持拖动表头调整。</summary>
     [ObservableProperty]
@@ -181,19 +208,35 @@ public partial class FileExplorerViewModel : ViewModelBase
     [RelayCommand]
     private void GoBack()
     {
+        TryGoBack();
+    }
+
+    /// <summary>返回上一级目录；供窗口先播放退场动画再执行。</summary>
+    public bool TryGoBack()
+    {
         if (_backHistory.Count == 0)
-            return;
+            return false;
 
         var target = _backHistory.Pop();
         NavigateTo(target, pushHistory: false);
+        return true;
     }
 
     [RelayCommand]
     private void GoUp()
     {
+        TryGoUp();
+    }
+
+    /// <summary>进入父文件夹；没有父目录时返回 false。</summary>
+    public bool TryGoUp()
+    {
         var parent = ParentPathOf(_currentPath);
-        if (parent is not null)
-            NavigateTo(parent, pushHistory: true);
+        if (parent is null)
+            return false;
+
+        NavigateTo(parent, pushHistory: true);
+        return true;
     }
 
     [RelayCommand]
@@ -437,8 +480,27 @@ public partial class FileExplorerViewModel : ViewModelBase
         if (sources.Count == 0)
             return;
 
+        await RunTransferAsync(sources, _currentPath, isCut, clearClipboardWhenDone: true);
+    }
+
+    /// <summary>拖放进入窗口：把外部/内部文件复制或移动到目标目录。</summary>
+    public Task DropTransferAsync(IReadOnlyList<string> sources, string targetDirectory, bool move) =>
+        RunTransferAsync(sources, targetDirectory, move, clearClipboardWhenDone: false);
+
+    /// <summary>拖动某一行时参与拖拽的路径：已选中则拖动整个选择，否则只拖该行。</summary>
+    public IReadOnlyList<string> GetDragPaths(FileEntry entry) =>
+        entry.IsSelected
+            ? SelectedEntries.Select(e => e.Path).ToList()
+            : [entry.Path];
+
+    public bool IsDemoDrive => Drive.IsDemo;
+
+    public bool CanAcceptDrop => IsRealDrive && !IsOperationInProgress;
+
+    private async Task<bool> RunTransferAsync(IReadOnlyList<string> sources, string targetDirectory,
+        bool isCut, bool clearClipboardWhenDone)
+    {
         var plans = new List<PastePlan>();
-        var targetDirectory = _currentPath;
 
         foreach (var source in sources)
         {
@@ -446,7 +508,7 @@ public partial class FileExplorerViewModel : ViewModelBase
             if (!isDirectory && !File.Exists(source))
                 continue;
 
-            // 不能把文件夹粘贴到它自己或它的子目录里
+            // 不能把文件夹复制/移动到它自己或它的子目录里
             if (isDirectory && IsSameOrChild(targetDirectory, source))
                 continue;
 
@@ -461,25 +523,38 @@ public partial class FileExplorerViewModel : ViewModelBase
         }
 
         if (plans.Count == 0)
-            return;
+        {
+            Log.Info($"拖放：没有可复制的项目（源 {sources.Count} 项，目标={targetDirectory}）");
+            return false;
+        }
 
         _operationCts = new CancellationTokenSource();
+        _operationGate = new ManualResetEventSlim(true);
         var token = _operationCts.Token;
         var cancelled = false;
 
-        BeginOperation(isCut ? "正在移动" : "正在复制", "正在准备…", canCancel: true);
+        Log.Info($"开始{(isCut ? "移动" : "复制")} {plans.Count} 项 → {targetDirectory}");
+
+        BeginOperation(isCut ? "正在移动" : "正在复制", "正在准备…", canCancel: true, canPause: true);
 
         var progress = new Progress<FileOperationProgress>(value =>
         {
             IsOperationIndeterminate = false;
             OperationPercent = value.Percent;
             OperationDetail = value.Detail;
-            OperationItemsText = value.ItemsText;
+            OperationItemsText = $"{value.DoneItems} / {value.TotalItems} 个项目";
+            OperationSizeText = $"{FormatBytes(value.DoneBytes)} / {FormatBytes(value.TotalBytes)}";
+            OperationSpeedText = IsOperationPaused
+                ? "已暂停"
+                : value.BytesPerSecond > 0
+                    ? $"{FormatBytes((long)value.BytesPerSecond)}/s"
+                    : string.Empty;
         });
 
         try
         {
-            await Task.Run(() => ExecutePaste(plans, targetDirectory, isCut, progress, token), token);
+            var result = await Task.Run(() => ExecutePaste(plans, targetDirectory, isCut, progress, token), token);
+            Log.Info($"{(isCut ? "移动" : "复制")}完成：成功 {result.Succeeded} 项，失败 {result.Failed} 项 → {targetDirectory}");
         }
         catch (OperationCanceledException)
         {
@@ -487,16 +562,19 @@ public partial class FileExplorerViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Log.Error("粘贴操作失败", ex);
+            Log.Error("文件传输失败", ex);
         }
         finally
         {
             _operationCts?.Dispose();
             _operationCts = null;
+            _operationGate?.Dispose();
+            _operationGate = null;
+            IsOperationPaused = false;
             EndOperation();
         }
 
-        if (isCut && !cancelled)
+        if (isCut && !cancelled && clearClipboardWhenDone)
         {
             _clipboardPaths.Clear();
             _clipboardIsCut = false;
@@ -504,6 +582,7 @@ public partial class FileExplorerViewModel : ViewModelBase
         }
 
         LoadDirectory(FileListChangeKind.Navigation);
+        return !cancelled;
     }
 
     private List<string> ResolveClipboard(out bool cut)
@@ -522,14 +601,44 @@ public partial class FileExplorerViewModel : ViewModelBase
     [RelayCommand]
     private void CancelOperation() => _operationCts?.Cancel();
 
-    private void BeginOperation(string title, string detail, bool canCancel)
+    [RelayCommand]
+    private void TogglePauseOperation()
+    {
+        if (_operationGate is null)
+            return;
+
+        if (IsOperationPaused)
+        {
+            IsOperationPaused = false;
+            _operationGate.Set();
+            return;
+        }
+
+        IsOperationPaused = true;
+        OperationSpeedText = "已暂停";
+        _operationGate.Reset();
+    }
+
+    /// <summary>后台写入循环在每个分块/每个条目前调用；暂停时阻塞，取消时抛出。</summary>
+    private void WaitIfPaused(CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        _operationGate?.Wait(token);
+        token.ThrowIfCancellationRequested();
+    }
+
+    private void BeginOperation(string title, string detail, bool canCancel, bool canPause)
     {
         OperationTitle = title;
         OperationDetail = detail;
         OperationItemsText = string.Empty;
+        OperationSizeText = string.Empty;
+        OperationSpeedText = string.Empty;
         OperationPercent = 0;
         IsOperationIndeterminate = true;
+        IsOperationPaused = false;
         CanCancelOperation = canCancel;
+        CanPauseOperation = canPause;
         IsOperationInProgress = true;
     }
 
@@ -562,7 +671,7 @@ public partial class FileExplorerViewModel : ViewModelBase
 
         BeginOperation("正在删除",
             selected.Count == 1 ? selected[0].Name : $"已选择 {selected.Count} 个项目",
-            canCancel: false);
+            canCancel: false, canPause: false);
 
         try
         {
@@ -616,24 +725,40 @@ public partial class FileExplorerViewModel : ViewModelBase
     {
         private readonly IProgress<FileOperationProgress> _progress;
         private readonly Stopwatch _watch = Stopwatch.StartNew();
-        private TimeSpan _last = TimeSpan.Zero;
+        private TimeSpan _lastReport = TimeSpan.Zero;
+        private TimeSpan _lastSpeedTick = TimeSpan.Zero;
+        private long _lastSpeedBytes;
+        private double _bytesPerSecond;
 
         public OperationReporter(IProgress<FileOperationProgress> progress) => _progress = progress;
 
         public void Report(string detail, long doneBytes, long totalBytes, int doneItems, int totalItems,
             bool force = false)
         {
+            var now = _watch.Elapsed;
+
+            // 约每 200ms 采样一次瞬时速度，再做平滑，避免数字剧烈跳动
+            var speedWindow = now - _lastSpeedTick;
+            if (speedWindow.TotalMilliseconds >= 200)
+            {
+                var instant = (doneBytes - _lastSpeedBytes) / speedWindow.TotalSeconds;
+                _bytesPerSecond = _bytesPerSecond <= 0 ? instant : _bytesPerSecond * 0.6 + instant * 0.4;
+                _lastSpeedBytes = doneBytes;
+                _lastSpeedTick = now;
+            }
+
             // 限制刷新频率，避免海量小文件把 UI 线程淹没
-            if (!force && _watch.Elapsed - _last < TimeSpan.FromMilliseconds(80))
+            if (!force && now - _lastReport < TimeSpan.FromMilliseconds(80))
                 return;
 
-            _last = _watch.Elapsed;
+            _lastReport = now;
             var percent = totalBytes > 0 ? Math.Clamp(doneBytes * 100.0 / totalBytes, 0, 100) : 0;
-            _progress.Report(new FileOperationProgress(percent, detail, $"{doneItems} / {totalItems} 个项目"));
+            _progress.Report(new FileOperationProgress(percent, detail, doneItems, totalItems,
+                doneBytes, totalBytes, _bytesPerSecond));
         }
     }
 
-    private static void ExecutePaste(IReadOnlyList<PastePlan> plans, string targetDirectory, bool isCut,
+    private (int Succeeded, int Failed) ExecutePaste(IReadOnlyList<PastePlan> plans, string targetDirectory, bool isCut,
         IProgress<FileOperationProgress> progress, CancellationToken token)
     {
         // 先统计总大小与文件数，用于进度百分比
@@ -644,7 +769,7 @@ public partial class FileExplorerViewModel : ViewModelBase
 
         for (var i = 0; i < plans.Count; i++)
         {
-            token.ThrowIfCancellationRequested();
+            WaitIfPaused(token);
             var plan = plans[i];
 
             if (plan.IsDirectory)
@@ -664,11 +789,13 @@ public partial class FileExplorerViewModel : ViewModelBase
         var reporter = new OperationReporter(progress);
         long doneBytes = 0;
         var doneItems = 0;
+        var succeeded = 0;
+        var failed = 0;
         reporter.Report("准备完成", 0, totalBytes, 0, totalItems, force: true);
 
         for (var i = 0; i < plans.Count; i++)
         {
-            token.ThrowIfCancellationRequested();
+            WaitIfPaused(token);
             var plan = plans[i];
             var name = Path.GetFileName(plan.Source.TrimEnd(Path.DirectorySeparatorChar));
 
@@ -688,6 +815,7 @@ public partial class FileExplorerViewModel : ViewModelBase
 
                         doneBytes += sizes[i];
                         doneItems += items[i];
+                        succeeded++;
                         reporter.Report($"正在移动 {name}", doneBytes, totalBytes, doneItems, totalItems,
                             force: true);
                         continue;
@@ -717,6 +845,9 @@ public partial class FileExplorerViewModel : ViewModelBase
                     else
                         File.Delete(plan.Source);
                 }
+
+                succeeded++;
+                Log.Info($"已{(isCut ? "移动" : "复制")}：{plan.Source} → {destination}");
             }
             catch (OperationCanceledException)
             {
@@ -724,16 +855,19 @@ public partial class FileExplorerViewModel : ViewModelBase
             }
             catch (Exception ex)
             {
+                failed++;
                 Log.Error($"粘贴失败：{plan.Source}", ex);
             }
         }
+
+        return (succeeded, failed);
     }
 
-    private static void CopyFileWithProgress(string source, string destination,
+    private void CopyFileWithProgress(string source, string destination,
         ref long doneBytes, ref int doneItems, long totalBytes, int totalItems,
         OperationReporter reporter, CancellationToken token)
     {
-        token.ThrowIfCancellationRequested();
+        WaitIfPaused(token);
         var buffer = new byte[1024 * 1024];
 
         try
@@ -746,7 +880,7 @@ public partial class FileExplorerViewModel : ViewModelBase
             int read;
             while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
             {
-                token.ThrowIfCancellationRequested();
+                WaitIfPaused(token);
                 output.Write(buffer, 0, read);
                 doneBytes += read;
                 reporter.Report($"正在复制 {Path.GetFileName(source)}", doneBytes, totalBytes,
@@ -776,11 +910,11 @@ public partial class FileExplorerViewModel : ViewModelBase
             totalItems, force: true);
     }
 
-    private static void CopyDirectoryWithProgress(string source, string destination,
+    private void CopyDirectoryWithProgress(string source, string destination,
         ref long doneBytes, ref int doneItems, long totalBytes, int totalItems,
         OperationReporter reporter, CancellationToken token)
     {
-        token.ThrowIfCancellationRequested();
+        WaitIfPaused(token);
         Directory.CreateDirectory(destination);
 
         foreach (var file in Directory.EnumerateFiles(source))
@@ -798,13 +932,13 @@ public partial class FileExplorerViewModel : ViewModelBase
         try { Directory.SetLastWriteTime(destination, Directory.GetLastWriteTime(source)); } catch { }
     }
 
-    private static void CountDirectory(string path, ref long bytes, ref int items, CancellationToken token)
+    private void CountDirectory(string path, ref long bytes, ref int items, CancellationToken token)
     {
-        token.ThrowIfCancellationRequested();
+        WaitIfPaused(token);
 
         foreach (var file in Directory.EnumerateFiles(path))
         {
-            token.ThrowIfCancellationRequested();
+            WaitIfPaused(token);
             try { bytes += new FileInfo(file).Length; } catch { }
             items++;
         }
@@ -857,6 +991,19 @@ public partial class FileExplorerViewModel : ViewModelBase
     [RelayCommand]
     private void CancelRename() => IsRenamePromptVisible = false;
 
+    [RelayCommand(CanExecute = nameof(CanOpenSelected))]
+    private void OpenSelected()
+    {
+        var entry = SelectedEntries.FirstOrDefault();
+        if (entry is not null)
+            Open(entry);
+    }
+
+    private bool CanOpenSelected() => _entries.Any(e => e.IsSelected);
+
+    /// <summary>当前是否有选中项（供右键菜单等界面使用）。</summary>
+    public bool HasSelection => _entries.Any(e => e.IsSelected);
+
     private bool CanModify() => IsRealDrive && !IsOperationInProgress;
 
     private bool CanCopyOrCut() =>
@@ -869,12 +1016,31 @@ public partial class FileExplorerViewModel : ViewModelBase
 
     private void RaiseCommandStates()
     {
+        OnPropertyChanged(nameof(HasSelection));
+
         CopyCommand.NotifyCanExecuteChanged();
         CutCommand.NotifyCanExecuteChanged();
         PasteCommand.NotifyCanExecuteChanged();
         DeleteCommand.NotifyCanExecuteChanged();
         RenameCommand.NotifyCanExecuteChanged();
         NewFolderCommand.NotifyCanExecuteChanged();
+        OpenSelectedCommand.NotifyCanExecuteChanged();
+    }
+
+    private static readonly string[] SizeUnits = ["B", "KB", "MB", "GB", "TB"];
+
+    private static string FormatBytes(long bytes)
+    {
+        double size = bytes;
+        var unit = 0;
+
+        while (size >= 1024 && unit < SizeUnits.Length - 1)
+        {
+            size /= 1024;
+            unit++;
+        }
+
+        return $"{size:0.#} {SizeUnits[unit]}";
     }
 
     private static bool IsSameOrChild(string candidate, string parent)
@@ -1184,6 +1350,13 @@ public partial class FileExplorerViewModel : ViewModelBase
     partial void OnSortColumnChanged(FileSortColumn value) => RaiseSortIndicators();
 
     partial void OnIsOperationInProgressChanged(bool value) => RaiseCommandStates();
+
+    partial void OnOperationPercentChanged(double value) => OnPropertyChanged(nameof(OperationPercentText));
+
+    partial void OnIsOperationPausedChanged(bool value) => OnPropertyChanged(nameof(OperationPauseText));
+
+    partial void OnIsOperationIndeterminateChanged(bool value) =>
+        OnPropertyChanged(nameof(OperationPercentText));
 
     partial void OnSortDescendingChanged(bool value) => RaiseSortIndicators();
 
